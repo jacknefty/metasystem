@@ -10,7 +10,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getChain } from '../coordination/channels/chain.js';
 import { listWork } from '../coordination/resources/work.js';
-import { getDataDir } from '../identity/paths.js';
+import { paths } from '../identity/paths.js';
 import { listDAOs, type DAORegistration } from './registry.js';
 import { getFreeEnergy, getFreeEnergyState } from '../control/dynamics/free-energy.js';
 import { getAggregatePrecision, getPrecisionStats, type PrecisionRecord } from '../control/dynamics/precision.js';
@@ -75,11 +75,11 @@ const history: NetworkHistory[] = [];
 const MAX_HISTORY = 1000;
 
 function getStatePath(): string {
-  return join(getDataDir(), 'network-state.json');
+  return paths.network.state();
 }
 
 function getHistoryPath(): string {
-  return join(getDataDir(), 'network-history.jsonl');
+  return paths.network.history();
 }
 
 export function loadNetworkState(): NetworkState {

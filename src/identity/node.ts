@@ -5,9 +5,11 @@
  */
 
 import { randomUUID } from 'crypto';
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { getChain } from '../coordination/channels/chain.js';
 import { deriveAllNodes, deriveNode, type DerivedNode } from '../coordination/resources/derive.js';
 import { DEFAULT_SETTINGS, type NodeSettings } from './settings.js';
+import { paths } from './paths.js';
 
 export { DEFAULT_SETTINGS, type NodeSettings, type DerivedNode };
 
@@ -48,7 +50,66 @@ export async function createNode(input: CreateNodeInput): Promise<string> {
     await chain.append('identity:settings', 'system', nodeId, input.settings);
   }
 
+  // Create node directory and identity.md
+  ensureNodeDirectory(nodeId, input);
+
   return nodeId;
+}
+
+function ensureNodeDirectory(nodeId: string, input: CreateNodeInput): void {
+  const nodeDir = paths.node(nodeId);
+  const memoryDir = paths.nodeMemory(nodeId);
+
+  if (!existsSync(nodeDir)) {
+    mkdirSync(nodeDir, { recursive: true });
+  }
+  if (!existsSync(memoryDir)) {
+    mkdirSync(memoryDir, { recursive: true });
+  }
+
+  const identityPath = paths.nodeIdentityFile(nodeId);
+  if (!existsSync(identityPath)) {
+    const identityContent = generateIdentityMd(nodeId, input);
+    writeFileSync(identityPath, identityContent);
+  }
+}
+
+function generateIdentityMd(nodeId: string, input: CreateNodeInput): string {
+  const scope = input.scope ?? ['**'];
+  return `# ${input.name}
+
+## Purpose
+
+${input.purpose}
+
+## Scope
+
+${scope.map(s => `- \`${s}\``).join('\n')}
+
+## Identity
+
+- **ID**: ${nodeId}
+- **Created**: ${new Date().toISOString()}
+
+## Memory
+
+This node's learned patterns and preferences are stored in the \`memory/\` directory.
+`;
+}
+
+export function getNodeIdentityContent(nodeId: string): string | null {
+  const identityPath = paths.nodeIdentityFile(nodeId);
+  if (!existsSync(identityPath)) return null;
+  return readFileSync(identityPath, 'utf-8');
+}
+
+export function updateNodeIdentity(nodeId: string, content: string): void {
+  const identityPath = paths.nodeIdentityFile(nodeId);
+  const nodeDir = paths.node(nodeId);
+  if (!existsSync(nodeDir)) {
+    mkdirSync(nodeDir, { recursive: true });
+  }
+  writeFileSync(identityPath, content);
 }
 
 export async function updateNode(nodeId: string, updates: NodeUpdates): Promise<void> {

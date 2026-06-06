@@ -56,8 +56,9 @@ export function bootstrap(): void {
   const dirs = [
     paths.root(),
     paths.identity(),
-    paths.chain(),
+    paths.nodes(),
     paths.contexts(),
+    paths.worktrees(),
     paths.cache(),
     paths.extensions.root(),
     paths.extensions.verifiers(),

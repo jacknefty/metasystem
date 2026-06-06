@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import { getChain } from '../coordination/channels/chain.js';
-import { paths, getDataDir } from '../identity/paths.js';
+import { paths } from '../identity/paths.js';
 
 // =============================================================================
 // Types
@@ -51,7 +51,7 @@ export interface DAORegistration {
 const registry = new Map<DAOAddress, DAORegistration>();
 
 function getRegistryPath(): string {
-  return join(getDataDir(), 'dao-registry.json');
+  return paths.network.daoRegistry();
 }
 
 function loadRegistry(): void {
@@ -70,7 +70,7 @@ function loadRegistry(): void {
 
 function saveRegistry(): void {
   const path = getRegistryPath();
-  const dir = getDataDir();
+  const dir = paths.root();
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }

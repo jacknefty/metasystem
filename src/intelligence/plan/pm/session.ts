@@ -7,11 +7,11 @@
 import { randomUUID } from 'crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { getDataDir } from '../../../identity/paths.js';
+import { paths } from '../../../identity/paths.js';
 import type { PMSession, PMPhase, PartialContract, WorkGraph, ConversationTurn } from './types.js';
 
 function getSessionsDir(): string {
-  const dir = join(getDataDir(), 'pm-sessions');
+  const dir = paths.pmSessions();
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }

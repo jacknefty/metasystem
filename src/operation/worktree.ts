@@ -9,7 +9,7 @@ import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { paths } from '../identity/paths.js';
 
 const execAsync = promisify(execCallback);
 
@@ -31,11 +31,11 @@ async function git(args: string, cwd: string): Promise<{ success: boolean; outpu
 }
 
 export function getWorktreesDir(): string {
-  return join(homedir(), '.metasystem', 'worktrees');
+  return paths.worktrees();
 }
 
 export function getWorktreePath(workId: string): string {
-  return join(getWorktreesDir(), workId);
+  return paths.worktree(workId);
 }
 
 function ensureWorktreesDir(): void {

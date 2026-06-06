@@ -5,13 +5,13 @@
  */
 
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
-import { homedir } from 'os';
+import { dirname } from 'path';
 import { EventEmitter } from 'events';
 import type { ChainBackend, EventFilter } from '../backend.js';
 import { createEvent, type ChainEvent, type EventType, type EventPayloads } from '../events.js';
+import { paths } from '../../../identity/paths.js';
 
-const DEFAULT_CHAIN_PATH = join(homedir(), '.metasystem', 'chain.jsonl');
+const DEFAULT_CHAIN_PATH = paths.chainFile();
 
 export class LocalChain extends EventEmitter implements ChainBackend {
   private log: ChainEvent[] = [];

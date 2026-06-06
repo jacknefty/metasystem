@@ -13,7 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getChain } from '../coordination/channels/chain.js';
 import { getMerkleRoot, getMerkleProof, getCredit, markCreditsMinted } from '../control/dynamics/bridge.js';
-import { getDataDir } from '../identity/paths.js';
+import { paths } from '../identity/paths.js';
 
 // =============================================================================
 // Configuration
@@ -96,7 +96,7 @@ let bridgeConfig: BridgeConfig = {
 // =============================================================================
 
 function getConfigPath(): string {
-  return join(getDataDir(), 'bridge-config.json');
+  return paths.network.bridgeConfig();
 }
 
 export function loadBridgeConfig(): BridgeConfig {

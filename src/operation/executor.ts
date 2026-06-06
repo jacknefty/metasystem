@@ -5,7 +5,6 @@
  */
 
 import { spawn, execSync } from 'child_process';
-import { homedir } from 'os';
 import { join } from 'path';
 
 export interface ExecutionResult {
