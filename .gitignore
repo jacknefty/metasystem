@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+*.js
+*.js.map
+*.d.ts
+!hardhat.config.ts
+!contracts/**/*.ts
+
+# Contracts build artifacts
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data
+*.jsonl
+*.log
+data/
+.metasystem/
+
+# Deployment artifacts (keep contract source, ignore compiled)
+.contract-address
+contracts/deployments/
+
+# Test coverage
+coverage/
+coverage.json

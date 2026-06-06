@@ -1,0 +1,243 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   METASYSTEM DAO DESIGN SYSTEM
+   ============================================ */
+
+:root {
+  /* Background layers - deep space black */
+  --color-bg-void: #000000;
+  --color-bg-deep: #050608;
+  --color-bg-surface: #0a0d10;
+  --color-bg-elevated: #0f1318;
+  --color-bg-panel: #141920;
+
+  /* Borders */
+  --color-border-subtle: #1f2937;
+  --color-border: #374151;
+  --color-border-glow: #4b5563;
+
+  /* Text */
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+
+  /* Accent - S5 gold */
+  --color-accent: #f59e0b;
+  --color-accent-glow: #fbbf24;
+
+  /* Status */
+  --color-status-healthy: #10b981;
+  --color-status-warning: #f59e0b;
+  --color-status-critical: #ef4444;
+  --color-status-inactive: #6b7280;
+
+  /* Node colors */
+  --color-node-s5: #f59e0b;
+  --color-node-member: #06b6d4;
+  --color-node-project: #a855f7;
+  --color-node-dao: #3b82f6;
+
+  /* Shadows */
+  --shadow-glow: 0 0 20px rgba(251, 191, 36, 0.3);
+  --shadow-panel: 0 -4px 20px rgba(0, 0, 0, 0.5);
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* ============================================
+   GLOBAL STYLES
+   ============================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg-void);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   BEZEL / VIEWPORT FRAME
+   ============================================ */
+
+.bezel {
+  position: relative;
+  height: 100%;
+  padding: 16px;
+  background: var(--color-bg-deep);
+}
+
+.viewport {
+  position: relative;
+  height: 100%;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ============================================
+   NODE BOX
+   ============================================ */
+
+.node-box {
+  position: absolute;
+  width: 120px;
+  height: 80px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.node-box:hover {
+  transform: scale(1.05);
+}
+
+.node-box.selected {
+  transform: scale(1.1);
+}
+
+.node-box.s5 {
+  border-color: var(--color-node-s5);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+.node-box.member {
+  border-color: var(--color-node-member);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.node-box.project {
+  border-color: var(--color-node-project);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.node-box.dao {
+  border-color: var(--color-node-dao);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.node-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  text-align: center;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-type {
+  font-size: 0.625rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+/* ============================================
+   FOCUS PANEL
+   ============================================ */
+
+.focus-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 85%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-panel);
+  border-top: 1px solid var(--color-border);
+  border-radius: 12px 12px 0 0;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.focus-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.focus-panel-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* ============================================
+   ADD BUTTON
+   ============================================ */
+
+.add-button {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: var(--color-text-secondary);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.add-button:hover {
+  background: var(--color-bg-panel);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-glow);
+}

@@ -1,0 +1,578 @@
+/**
+ * Chain Event Types
+ *
+ * All event types and their payloads. ~24 types covering:
+ * - Identity lifecycle
+ * - Membership
+ * - Work lifecycle (including bounty/pull model)
+ * - Variety (env:in, work:out only)
+ * - Algedonic signals
+ * - Conditions
+ */
+
+import { randomUUID } from 'crypto';
+import type { NodeSettings } from '../../identity/settings.js';
+
+export type EventType =
+  // Identity
+  | 'identity:created'
+  | 'identity:updated'
+  | 'identity:terminated'
+  | 'identity:settings'
+  // Membership
+  | 'membership:joined'
+  | 'membership:left'
+  // Work lifecycle
+  | 'work:created'
+  | 'work:posted'
+  | 'work:claimed'
+  | 'work:submitted'
+  | 'work:verified'
+  | 'work:completed'
+  | 'work:released'
+  | 'work:failed'
+  | 'work:expired'
+  // Variety (all 4 domains × 2 directions)
+  | 'variety:work:in'
+  | 'variety:work:out'
+  | 'variety:env:in'
+  | 'variety:env:out'
+  | 'variety:coord:in'
+  | 'variety:coord:out'
+  | 'variety:identity:in'
+  | 'variety:identity:out'
+  // Credits
+  | 'credit:earned'
+  // Dynamics (unified Bohmian + Free Energy)
+  | 'bohmian:evolved'
+  | 'dynamics:evolved'
+  | 'action:evaluated'
+  | 'action:selected'
+  // Precision Learning
+  | 'precision:prediction'
+  | 'precision:observation'
+  | 'precision:updated'
+  // Token Minting
+  | 'mint:executed'
+  | 'credit:minted'
+  // Bridge (On-chain)
+  | 'credit:created'
+  | 'credit:challenged'
+  | 'credit:disputed'
+  | 'credit:confirmed'
+  | 'credits:minted'
+  | 'challenge:failed'
+  // DAO Registry
+  | 'dao:registered'
+  | 'dao:updated'
+  | 'dao:unregistered'
+  | 'dao:f_initial'
+  // Contract (On-chain)
+  | 'root:committed'
+  | 'mint:confirmed'
+  // Network
+  | 'network:genesis'
+  // Algedonic
+  | 'algedonic:pain'
+  | 'algedonic:pleasure'
+  | 'algedonic:acknowledged'
+  // Conditions
+  | 'condition:met'
+  | 'condition:confidence'
+  // Product Manager
+  | 'pm:session:created'
+  | 'pm:message'
+  | 'pm:decision:requested'
+  | 'pm:decision:resolved'
+  | 'pm:contract:updated'
+  | 'pm:ready-to-decompose'
+  // Learning
+  | 'learning:recorded'
+  | 'learning:pattern'
+  | 'learning:verifier:recorded'
+  | 'learning:verifier:false-positive'
+  | 'learning:verifier:proposed'
+  // Scope Locking
+  | 'scope:acquired'
+  | 'scope:released'
+  // Merge
+  | 'work:merged';
+
+export interface Condition {
+  id: string;
+  description: string;
+  verifier: string;
+  varietyWeight?: number;
+}
+
+export interface Bounty {
+  amount: number;
+  currency: 'variety';
+  postedAt: number;
+  expiresAt?: number;
+}
+
+export interface WorkContract {
+  problem?: string;
+  successMetric?: string;
+  scopeIn?: string[];
+  scopeOut?: string[];
+  constraints?: string[];
+  assumptions?: string[];
+  risks?: string[];
+}
+
+export interface NetworkOrigin {
+  daoAddress: string;
+  chainId: number;
+  txHash?: string;
+}
+
+export interface EventPayloads {
+  'identity:created': {
+    name: string;
+    purpose: string;
+    scope: string[];
+  };
+
+  'identity:updated': {
+    field: 'purpose' | 'scope' | 'name';
+    oldValue: unknown;
+    newValue: unknown;
+  };
+
+  'identity:terminated': {
+    reason: string;
+  };
+
+  'identity:settings': Partial<NodeSettings>;
+
+  'membership:joined': {
+    context: string;
+    role?: string;
+  };
+
+  'membership:left': {
+    context: string;
+    reason?: string;
+  };
+
+  'work:created': {
+    name: string;
+    contextId: string;
+    contextPath?: string;  // optional - can be resolved from context node at execution time
+    conditions: Condition[];
+    dependsOn?: string[];
+    contract?: WorkContract;
+    networkOrigin?: NetworkOrigin;
+    daoAddress?: string;  // chain:identifier format
+  };
+
+  'work:posted': {
+    bounty: Bounty;
+    claimableWhen?: { workCompleted: string[] };
+    networkOrigin?: NetworkOrigin;
+  };
+
+  'work:claimed': {
+    nodeId: string;
+    claimedAt: number;
+    deadline: number;
+    networkOrigin?: NetworkOrigin;
+  };
+
+  'work:submitted': {
+    nodeId: string;
+    branch: string;
+    submittedAt: number;
+    networkOrigin?: NetworkOrigin;
+  };
+
+  'work:verified': {
+    passed: boolean;
+    confidence: number;
+    evidence: string;
+    verifiedAt: number;
+    networkOrigin?: NetworkOrigin;
+  };
+
+  'work:completed': {
+    nodeId: string;
+    bountyAmount: number;
+    completedAt: number;
+    networkOrigin?: NetworkOrigin;
+  };
+
+  'work:released': {
+    nodeId: string;
+    reason: 'quit' | 'timeout' | 'blocked' | 'max_attempts';
+  };
+
+  'work:failed': {
+    reason: string;
+  };
+
+  'work:expired': {
+    expiredAt: number;
+  };
+
+  'variety:work:in': {
+    bits: number;
+    workId?: string;
+    conditionId?: string;
+    context?: string;
+  };
+
+  'variety:work:out': {
+    bits: number;
+    workId?: string;
+    conditionId?: string;
+    context?: string;
+  };
+
+  'variety:env:in': {
+    bits: number;
+    context?: string;
+  };
+
+  'variety:env:out': {
+    bits: number;
+    context?: string;
+  };
+
+  'variety:coord:in': {
+    bits: number;
+    context?: string;
+  };
+
+  'variety:coord:out': {
+    bits: number;
+    context?: string;
+  };
+
+  'variety:identity:in': {
+    bits: number;
+    context?: string;
+  };
+
+  'variety:identity:out': {
+    bits: number;
+    context?: string;
+  };
+
+  'credit:earned': {
+    workId: string;
+    nodeId: string;
+    bits: number;
+    amount: string;
+    proofHash: string;
+  };
+
+  'bohmian:evolved': {
+    Q: { verified: number; active: number; resources: number };
+    velocity: { verified: number; active: number; resources: number };
+    quantumPotential: number;
+    mass: number;
+  };
+
+  'dynamics:evolved': {
+    scope: { level: string; id?: string; contextId?: string };
+    Q: { verified: number; active: number; resources: number };
+    velocity: { verified: number; active: number; resources: number };
+    G: number;  // expected free energy = F + γH
+    quantumPotential: number;
+    mass: number;
+    τ_aggregate: number;
+    β: number;
+  };
+
+  'action:evaluated': {
+    actionId: string;
+    scope: { level: string; id?: string; contextId?: string };
+    G: number;
+    pragmatic: number;
+    epistemic: number;
+  };
+
+  'action:selected': {
+    actionId: string;
+    scope: { level: string; id?: string; contextId?: string };
+    G: number;
+    alternatives: number;
+  };
+
+  'precision:prediction': {
+    key: string;
+    scope: { level: string; id?: string; contextId?: string };
+    predictedOutcome: number;
+    source: string;
+    sourceWeight: number;
+  };
+
+  'precision:observation': {
+    key: string;
+    scope: { level: string; id?: string; contextId?: string };
+    actualOutcome: number;
+    predictionId: string;
+    squaredError: number;
+  };
+
+  'precision:updated': {
+    key: string;
+    scope: { level: string; id?: string; contextId?: string };
+    τ: number;
+    samples: number;
+    runningError: number;
+  };
+
+  'mint:executed': {
+    mintId: string;
+    workId: string;
+    nodeId: string;
+    ΔF: number;
+    confidence: number;
+    mint_rate: number;
+    mint_amount: string;          // bigint as string
+    F_network_after: number;
+    total_supply_after: string;   // bigint as string
+  };
+
+  'credit:minted': {
+    mintId: string;
+    workId: string;
+    amount: string;               // bigint as string
+    balance_after: string;        // bigint as string
+  };
+
+  'credit:created': {
+    creditId: string;
+    nodeId: string;
+    amount: string;
+    proofHash: string;
+    strategy: string;
+    τ: number;
+    challengeDeadline: number | null;
+    merkleRoot: string;
+    leafIndex: number;
+  };
+
+  'credit:challenged': {
+    challengeId: string;
+    challengerId: string;
+    creditId: string;
+  };
+
+  'credit:disputed': {
+    challengeId: string;
+    creditId: string;
+    challengerId: string;
+    amount: string;
+  };
+
+  'credit:confirmed': {
+    creditId: string;
+    workId: string;
+    nodeId: string;
+    amount: string;
+  };
+
+  'credits:minted': {
+    creditIds: string[];
+    merkleRoot: string;
+  };
+
+  'challenge:failed': {
+    challengeId: string;
+    creditId: string;
+    reason: string;
+  };
+
+  'dao:registered': {
+    address: string;
+    name: string;
+    contextPath?: string;
+    gitRemote?: string;
+  };
+
+  'dao:updated': {
+    address: string;
+    updates: Record<string, unknown>;
+  };
+
+  'dao:unregistered': {
+    address: string;
+  };
+
+  'dao:f_initial': {
+    address: string;
+    F_initial: number;
+  };
+
+  'root:committed': {
+    root: string;
+    chainId: string;
+    testnet: boolean;
+    txHash: string;
+  };
+
+  'mint:confirmed': {
+    creditIds: string[];
+    chainId: string;
+    testnet: boolean;
+    txHash: string;
+  };
+
+  'network:genesis': {
+    F_initial: number;
+    dao_count: number;
+  };
+
+  'algedonic:pain': {
+    severity: 1 | 2 | 3;
+    source: string;
+    message: string;
+    contextId?: string;
+    originContextId?: string;
+    escalationLevel?: number;
+    requiresAttestation?: boolean;
+  };
+
+  'algedonic:pleasure': {
+    significance: 1 | 2 | 3;
+    source: string;
+    message: string;
+    contextId?: string;
+  };
+
+  'algedonic:acknowledged': {
+    acknowledgedAt: number;
+  };
+
+  'condition:met': {
+    conditionId: string;
+    evidence: string;
+  };
+
+  'condition:confidence': {
+    conditionId: string;
+    confidence: number;
+    evidence: string;
+  };
+
+  'pm:session:created': {
+    contextId: string;
+  };
+
+  'pm:message': {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+  };
+
+  'pm:decision:requested': {
+    type: 'decomposition' | 'priority' | 'scope' | 'approval';
+    question: string;
+    options?: string[];
+    context: Record<string, unknown>;
+  };
+
+  'pm:decision:resolved': {
+    decisionId: string;
+    choice: string;
+  };
+
+  'pm:contract:updated': {
+    fields: Partial<WorkContract>;
+  };
+
+  'pm:ready-to-decompose': Record<string, never>;
+
+  'learning:recorded': {
+    workId: string;
+    nodeId: string;
+    outcome: 'success' | 'failure' | 'partial';
+    conditions: Array<{
+      id: string;
+      met: boolean;
+      confidence: number;
+      verifier: string;
+    }>;
+    executorUsed: string;
+    durationMs: number;
+    attempts: number;
+  };
+
+  'learning:pattern': {
+    patternType: 'verifier-accuracy' | 'executor-performance' | 'condition-difficulty';
+    key: string;
+    value: number;
+    sampleSize: number;
+  };
+
+  'scope:acquired': {
+    scope: string[];
+    acquiredAt: number;
+  };
+
+  'scope:released': {
+    scope: string[];
+    heldForMs: number;
+  };
+
+  'work:merged': {
+    branch: string;
+    mergedAt: number;
+    resolvedConflict?: boolean;
+  };
+
+  'learning:verifier:recorded': {
+    contextId: string;
+    pattern: string;
+    failureDescription: string;
+  };
+
+  'learning:verifier:false-positive': {
+    contextId: string;
+    pattern: string;
+    reason: string;
+  };
+
+  'learning:verifier:proposed': {
+    contextId: string;
+    pattern: string;
+    catchCount: number;
+  };
+}
+
+export interface ChainEvent<T extends EventType = EventType> {
+  id: string;
+  type: T;
+  timestamp: number;
+  emitter: string;
+  subject: string;
+  payload: EventPayloads[T];
+}
+
+export type PayloadOf<T extends EventType> = EventPayloads[T];
+
+export function createEvent<T extends EventType>(
+  type: T,
+  emitter: string,
+  subject: string,
+  payload: EventPayloads[T]
+): ChainEvent<T> {
+  return {
+    id: `evt_${randomUUID()}`,
+    type,
+    timestamp: Date.now(),
+    emitter,
+    subject,
+    payload,
+  };
+}
+
+export function isEventType<T extends EventType>(
+  event: ChainEvent,
+  type: T
+): event is ChainEvent<T> {
+  return event.type === type;
+}
