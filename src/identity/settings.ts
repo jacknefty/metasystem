@@ -39,6 +39,10 @@ export interface NodeSettings {
   path?: string;
   isRoot?: boolean;
 
+  // Tool policies
+  allowedTools?: string[];
+  deniedTools?: string[];
+
   // Dynamics parameters (optional — falls back to DEFAULT_PARAMETERS)
   invocationThreshold?: number;  // F above this triggers work (default: 0)
   perceptionThreshold?: number;  // F below this triggers scanning (default: -10)

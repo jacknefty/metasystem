@@ -11,6 +11,8 @@ import { EnforcedSecurityProvider } from './providers/enforced.js';
 export * from './types.js';
 export * from './scope.js';
 export * from './context.js';
+export * from './tools.js';
+export * from './audit-log.js';
 export { AdvisorySecurityProvider } from './providers/advisory.js';
 export { EnforcedSecurityProvider } from './providers/enforced.js';
 

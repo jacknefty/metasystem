@@ -33,6 +33,8 @@ import { checkFileInScope, filterFilesToScope, expandScope } from './coordinatio
 import { getChain } from './coordination/channels/chain.js';
 import { getBohmianState, getS4Field } from './intelligence/model/bohmian/index.js';
 import { perceiveEnvironment } from './intelligence/perceive/scan.js';
+import * as tools from './tools/index.js';
+import { checkToolHealth } from './tools/reliability.js';
 
 const app = express();
 app.use(cors());
@@ -1281,7 +1283,7 @@ app.get('/api/network/mint-rate', wrap(async (req, res) => {
 // --- Network (Legacy) ---
 import * as network from './coordination/channels/network/index.js';
 import * as boundary from './identity/boundary/index.js';
-import { queryAuditLog, getAuditSummary } from './audit/security.js';
+import { queryAuditLog, getAuditSummary } from './identity/boundary/audit-log.js';
 
 // --- Boundary (Security) ---
 app.get('/api/security/audit', wrap(async (req, res) => {
@@ -1693,6 +1695,46 @@ app.post('/api/algedonic/resolve', wrap(async (req, res) => {
   const { signalId } = req.body;
   await algedonic.acknowledgePain(signalId, 'user');
   res.json({ resolved: true });
+}));
+
+// --- Tools ---
+app.get('/api/tools', wrap(async (req, res) => {
+  const capability = req.query.capability ? str(req.query.capability) : undefined;
+  const source = req.query.source as 'builtin' | 'mcp' | undefined;
+  res.json(tools.listTools({ capability, source }));
+}));
+
+app.get('/api/tools/health', wrap(async (req, res) => {
+  res.json(await checkToolHealth());
+}));
+
+app.post('/api/tools/invoke', wrap(async (req, res) => {
+  const { toolId, parameters, nodeId, workId, scope } = req.body;
+  if (!toolId || !nodeId) {
+    res.status(400).json({ error: 'toolId and nodeId required' });
+    return;
+  }
+
+  const result = await tools.invoke({
+    toolId,
+    parameters: parameters || {},
+    context: {
+      nodeId,
+      workId,
+      scope: scope || ['**'],
+    },
+  });
+
+  res.json(result);
+}));
+
+app.get('/api/tools/:id', wrap(async (req, res) => {
+  const tool = tools.getTool(str(req.params.id));
+  if (!tool) {
+    res.status(404).json({ error: 'Tool not found' });
+    return;
+  }
+  res.json(tool);
 }));
 
 // Error handler

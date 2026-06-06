@@ -16,7 +16,7 @@ import type {
   AuditEntry,
 } from '../types.js';
 import { isInScope, isScopeSubset } from '../scope.js';
-import { logAuditEntry, queryAuditLog } from '../../../audit/security.js';
+import { logAuditEntry, queryAuditLog } from '../audit-log.js';
 import { getNode } from '../../node.js';
 
 const sessions = new Map<string, SecurityContext>();

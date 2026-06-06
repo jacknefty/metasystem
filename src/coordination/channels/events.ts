@@ -96,7 +96,11 @@ export type EventType =
   | 'scope:acquired'
   | 'scope:released'
   // Merge
-  | 'work:merged';
+  | 'work:merged'
+  // Tools
+  | 'tool:invoked'
+  | 'tool:denied'
+  | 'tool:audited';
 
 export interface Condition {
   id: string;
@@ -540,6 +544,23 @@ export interface EventPayloads {
     contextId: string;
     pattern: string;
     catchCount: number;
+  };
+
+  'tool:invoked': {
+    workId?: string;
+    success: boolean;
+    durationMs: number;
+  };
+
+  'tool:denied': {
+    reason: string;
+    decidedBy?: string;
+    workId?: string;
+  };
+
+  'tool:audited': {
+    passed: boolean;
+    discrepancy?: string;
   };
 }
 

@@ -1,12 +1,14 @@
 /**
  * Audit Log — Persistent record of all access decisions
+ *
+ * This is S5 policy enforcement logging, not S3* sporadic audit.
  */
 
 import { appendFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { paths } from '../identity/paths.js';
-import type { AuditEntry, AuditFilter, AccessOperation, AccessDecision, SecurityContext } from '../identity/boundary/types.js';
+import { paths } from '../paths.js';
+import type { AuditEntry, AuditFilter, AccessOperation, AccessDecision, SecurityContext } from './types.js';
 
 function getAuditDir(): string {
   const dir = join(paths.root(), 'security-audit');

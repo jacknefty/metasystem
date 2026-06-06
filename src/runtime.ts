@@ -15,10 +15,23 @@ import { selfAssess } from './audit/assess.js';
 import { evolveAgent } from './control/dynamics/index.js';
 import { addToMergeQueue, processMergeQueue, rebuildMergeQueue } from './operation/merge-queue.js';
 import { recordOutcome } from './intelligence/learn/recorder.js';
+import { registerProvider, refreshTools } from './tools/index.js';
+import { builtinProvider } from './tools/builtin/index.js';
+import { mcpProvider, connectAll as connectMCP } from './tools/mcp/index.js';
+import { loadStats as loadToolStats } from './tools/reliability.js';
+import { runToolAuditPass } from './tools/audit.js';
 import type { ChainEvent } from './coordination/channels/events.js';
 
 let running = false;
 const expiryTimeouts = new Map<string, NodeJS.Timeout>();
+
+export async function initializeTools(): Promise<void> {
+  registerProvider(builtinProvider);
+  registerProvider(mcpProvider);
+  loadToolStats();
+  await connectMCP();
+  await refreshTools();
+}
 
 export function startRuntime(): () => void {
   if (running) return () => stopRuntime();
@@ -43,6 +56,13 @@ export function startRuntime(): () => void {
 
         if (result.perceptionResult?.totalFindings) {
           console.log(`[Runtime] Dynamics triggered perception: ${result.perceptionResult.totalFindings} findings (F=${result.F.toFixed(2)})`);
+        }
+
+        // Sporadic tool audit (5% chance on variety events)
+        if (Math.random() < 0.05) {
+          runToolAuditPass().catch(err => {
+            console.error('[Runtime] Tool audit failed:', err);
+          });
         }
       } catch (err) {
         await emitPain('dynamics', event.subject, err);
@@ -214,7 +234,7 @@ export function startRuntime(): () => void {
   });
 
   console.log('[Runtime] Started (event-driven)');
-  console.log('  - variety:env:in → dynamics check');
+  console.log('  - variety:env:in → dynamics check + sporadic tool audit');
   console.log('  - work:claimed → execute work');
   console.log('  - work:submitted → verification');
   console.log('  - work:verified → finalize + merge queue');
@@ -223,6 +243,7 @@ export function startRuntime(): () => void {
   console.log('  - work state changes → housekeeping');
   console.log('  - work:merged → self-assessment');
   console.log('  - dynamics evolution on state changes');
+  console.log('  - tools registered: builtin + MCP');
 
   return () => stopRuntime();
 }

@@ -53,6 +53,12 @@ export const paths = {
   // Cache (derived state, rebuildable)
   cache: () => join(getDataDir(), 'cache'),
 
+  // Tools
+  tools: {
+    stats: () => join(getDataDir(), 'tools', 'stats.json'),
+    mcpServers: () => join(getDataDir(), 'mcp-servers.json'),
+  },
+
   // Extensions
   extensions: {
     root: () => join(getDataDir(), 'extensions'),

@@ -5,7 +5,7 @@
 import { ensureInitialized } from './identity/bootstrap.js';
 import { getChain } from './coordination/channels/chain.js';
 import { initRegistry } from './control/verify/registry.js';
-import { startRuntime, stopRuntime } from './runtime.js';
+import { startRuntime, stopRuntime, initializeTools } from './runtime.js';
 import { startServer } from './api.js';
 import { ensureMetaSystemRegistered } from './network/registry.js';
 
@@ -24,6 +24,9 @@ async function main() {
   // Auto-register MetaSystem as first DAO
   const dao = await ensureMetaSystemRegistered();
   console.log(`[DAO] ${dao.name} registered at ${dao.address}`);
+
+  // Initialize tools
+  await initializeTools();
 
   // Start event-driven runtime
   const stop = startRuntime();
