@@ -54,6 +54,11 @@ export interface IdentitySettings {
   maxAttempts: number;
   confidenceThreshold: number;
   availableForWork: boolean;
+  // Dynamics parameters
+  invocationThreshold?: number;  // F above this triggers work (default: 0)
+  perceptionThreshold?: number;  // F below this triggers scanning (default: -10)
+  γ?: number;                    // epistemic weight in G = F + γH (default: 0.1)
+  β_base?: number;               // inverse temperature for action selection (default: 1.0)
 }
 
 export interface Membership {

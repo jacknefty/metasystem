@@ -142,6 +142,11 @@ export function deriveNode(events: ChainEvent[]): DerivedNode | null {
         if (p.revealIdentity !== undefined) node.settings.revealIdentity = p.revealIdentity;
         if (p.path !== undefined) node.settings.path = p.path;
         if (p.isRoot !== undefined) node.settings.isRoot = p.isRoot;
+        // Dynamics parameters
+        if (p.invocationThreshold !== undefined) node.settings.invocationThreshold = p.invocationThreshold;
+        if (p.perceptionThreshold !== undefined) node.settings.perceptionThreshold = p.perceptionThreshold;
+        if (p.γ !== undefined) node.settings.γ = p.γ;
+        if (p.β_base !== undefined) node.settings.β_base = p.β_base;
         node.updatedAt = event.timestamp;
         break;
       }

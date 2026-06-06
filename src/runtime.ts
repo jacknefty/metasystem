@@ -6,13 +6,13 @@
 
 import { getChain } from './coordination/channels/chain.js';
 import { getWork } from './coordination/resources/work.js';
-import { runHomeostat } from './control/balance/homeostat.js';
+import { runDynamicsControlTick } from './control/balance/homeostat.js';
 import { runVerification } from './control/verify/runner.js';
 import { executeWork, finalizeWork } from './operation/execute.js';
 import { rebuildLocks, clearStaleLocks } from './coordination/dampen/locks.js';
 import { maybeRunHousekeeping, clearStarvationSignal, clearHoardingSignal } from './coordination/dampen/housekeeping.js';
 import { selfAssess } from './audit/assess.js';
-import { evolveAgent, isBohmianEnabled } from './intelligence/model/bohmian/index.js';
+import { evolveAgent } from './control/dynamics/index.js';
 import { addToMergeQueue, processMergeQueue, rebuildMergeQueue } from './operation/merge-queue.js';
 import { recordOutcome } from './intelligence/learn/recorder.js';
 import type { ChainEvent } from './coordination/channels/events.js';
@@ -25,23 +25,27 @@ export function startRuntime(): () => void {
   running = true;
 
   const chain = getChain();
+  // Increase max listeners — we have many event handlers
+  if (typeof (chain as any).setMaxListeners === 'function') {
+    (chain as any).setMaxListeners(20);
+  }
 
-  // Any variety event → check homeostat (bidirectional)
+  // Any variety event → check dynamics homeostat (bidirectional)
   chain.on('event', async (event: ChainEvent) => {
     if (!running) return;
     if (event.type.startsWith('variety:')) {
       try {
-        const result = await runHomeostat();
+        const result = await runDynamicsControlTick();
 
         if (result.invocationResult?.workAssigned.length) {
-          console.log(`[Runtime] Homeostat invoked ${result.invocationResult.workAssigned.length} workers`);
+          console.log(`[Runtime] Dynamics invoked ${result.invocationResult.workAssigned.length} workers (F=${result.F.toFixed(2)})`);
         }
 
         if (result.perceptionResult?.totalFindings) {
-          console.log(`[Runtime] Homeostat triggered perception: ${result.perceptionResult.totalFindings} findings`);
+          console.log(`[Runtime] Dynamics triggered perception: ${result.perceptionResult.totalFindings} findings (F=${result.F.toFixed(2)})`);
         }
       } catch (err) {
-        await emitPain('homeostat', event.subject, err);
+        await emitPain('dynamics', event.subject, err);
       }
     }
   });
@@ -163,40 +167,38 @@ export function startRuntime(): () => void {
     }
   });
 
-  // Bohmian evolution on state-changing events
-  if (isBohmianEnabled()) {
-    chain.on('event', async (event: ChainEvent) => {
-      if (!running) return;
-      if (event.type === 'work:claimed') {
-        const payload = event.payload as { nodeId: string };
-        await evolveAgent(payload.nodeId, 1.0);
-      }
-    });
+  // Dynamics evolution on state-changing events
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'work:claimed') {
+      const payload = event.payload as { nodeId: string };
+      await evolveAgent(payload.nodeId, 1.0);
+    }
+  });
 
-    chain.on('event', async (event: ChainEvent) => {
-      if (!running) return;
-      if (event.type === 'work:completed') {
-        const payload = event.payload as { nodeId: string };
-        await evolveAgent(payload.nodeId, 1.0);
-      }
-    });
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'work:completed') {
+      const payload = event.payload as { nodeId: string };
+      await evolveAgent(payload.nodeId, 1.0);
+    }
+  });
 
-    chain.on('event', async (event: ChainEvent) => {
-      if (!running) return;
-      if (event.type === 'work:released') {
-        const payload = event.payload as { nodeId: string };
-        await evolveAgent(payload.nodeId, 1.0);
-      }
-    });
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'work:released') {
+      const payload = event.payload as { nodeId: string };
+      await evolveAgent(payload.nodeId, 1.0);
+    }
+  });
 
-    chain.on('event', async (event: ChainEvent) => {
-      if (!running) return;
-      if (event.type === 'credit:earned') {
-        const payload = event.payload as { nodeId: string };
-        await evolveAgent(payload.nodeId, 1.0);
-      }
-    });
-  }
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'credit:earned') {
+      const payload = event.payload as { nodeId: string };
+      await evolveAgent(payload.nodeId, 1.0);
+    }
+  });
 
   // Rebuild locks and merge queue from chain on startup
   rebuildLocks().catch(err => {
@@ -212,7 +214,7 @@ export function startRuntime(): () => void {
   });
 
   console.log('[Runtime] Started (event-driven)');
-  console.log('  - variety:env:in → homeostat check');
+  console.log('  - variety:env:in → dynamics check');
   console.log('  - work:claimed → execute work');
   console.log('  - work:submitted → verification');
   console.log('  - work:verified → finalize + merge queue');
@@ -220,9 +222,7 @@ export function startRuntime(): () => void {
   console.log('  - work:completed/failed → learning record');
   console.log('  - work state changes → housekeeping');
   console.log('  - work:merged → self-assessment');
-  if (isBohmianEnabled()) {
-    console.log('  - Bohmian evolution on state changes');
-  }
+  console.log('  - dynamics evolution on state changes');
 
   return () => stopRuntime();
 }

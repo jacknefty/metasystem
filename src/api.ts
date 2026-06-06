@@ -31,7 +31,7 @@ import { selfAssess } from './audit/assess.js';
 import { analyzeCoupling, getNextExecutableWork } from './coordination/dampen/strategy.js';
 import { checkFileInScope, filterFilesToScope, expandScope } from './coordination/dampen/scope.js';
 import { getChain } from './coordination/channels/chain.js';
-import { isBohmianEnabled, getBohmianState, getS4Field } from './intelligence/model/bohmian/index.js';
+import { getBohmianState, getS4Field } from './intelligence/model/bohmian/index.js';
 import { perceiveEnvironment } from './intelligence/perceive/scan.js';
 
 const app = express();
@@ -312,17 +312,19 @@ app.get('/api/dispatch/status', wrap(async (req, res) => {
   });
 }));
 
-// --- Homeostat ---
+// --- Homeostat (Dynamics-Driven) ---
 app.get('/api/vsm/homeostat', wrap(async (req, res) => {
-  res.json(await homeostat.getHomeostatState());
+  const { dynamicsHomeostat } = await import('./control/dynamics/index.js');
+  res.json(await dynamicsHomeostat());
 }));
 
 app.get('/api/vsm/health', wrap(async (req, res) => {
-  res.json(await homeostat.getHomeostatState());
+  const { dynamicsHomeostat } = await import('./control/dynamics/index.js');
+  res.json(await dynamicsHomeostat());
 }));
 
 app.post('/api/homeostat/run', wrap(async (req, res) => {
-  const result = await homeostat.runHomeostat();
+  const result = await homeostat.runDynamicsControlTick();
   res.json(result);
 }));
 
@@ -909,16 +911,14 @@ app.get('/api/events', (req, res) => {
   });
 });
 
-// --- Bohmian (if enabled) ---
-if (isBohmianEnabled()) {
-  app.get('/api/bohmian/state/:nodeId', wrap(async (req, res) => {
-    res.json(await getBohmianState(str(req.params.nodeId)));
-  }));
+// --- Bohmian ---
+app.get('/api/bohmian/state/:nodeId', wrap(async (req, res) => {
+  res.json(await getBohmianState(str(req.params.nodeId)));
+}));
 
-  app.get('/api/bohmian/field', wrap(async (req, res) => {
-    res.json(await getS4Field());
-  }));
-}
+app.get('/api/bohmian/field', wrap(async (req, res) => {
+  res.json(await getS4Field());
+}));
 
 // --- Unified Dynamics (G = F + γH) ---
 import * as dynamics from './control/dynamics/index.js';

@@ -142,10 +142,17 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
   useVarietyEvents(loadData);
   useCreditEvents(loadData);
 
-  // Handler to update identity settings and refresh
+  // Handler to update identity settings (optimistic update, no full reload)
   const handleSettingsChange = async (updates: Partial<Identity['settings']>) => {
+    // Optimistically update local state
+    if (identity) {
+      setIdentity({
+        ...identity,
+        settings: { ...identity.settings, ...updates },
+      });
+    }
+    // Persist to backend
     await updateIdentitySettings(nodeId, updates);
-    await loadData(); // Refresh to get updated identity
   };
 
   // State for root check
@@ -1266,6 +1273,178 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                     style={{ color: COLORS.text.muted }}
                   >
                     How many times to retry work before giving up
+                  </div>
+                </div>
+
+                {/* Dynamics Parameters */}
+                <div
+                  className="pt-4 mt-4"
+                  style={{ borderTop: `1px solid ${COLORS.border.subtle}` }}
+                >
+                  <div
+                    className="text-xs uppercase tracking-wide mb-3"
+                    style={{ color: COLORS.text.muted }}
+                  >
+                    Dynamics (Control Loop)
+                  </div>
+
+                  {/* Archetype Presets */}
+                  <div className="flex gap-2 mb-4">
+                    {[
+                      {
+                        name: 'Scout',
+                        icon: '🔭',
+                        params: { perceptionThreshold: 0, invocationThreshold: 10, γ: 0.3, β_base: 1.0 },
+                        desc: 'Scans eagerly, works reluctantly'
+                      },
+                      {
+                        name: 'Worker',
+                        icon: '⚡',
+                        params: { perceptionThreshold: -20, invocationThreshold: 0, γ: 0.05, β_base: 2.0 },
+                        desc: 'Heads down, executes queue'
+                      },
+                      {
+                        name: 'Balanced',
+                        icon: '⚖️',
+                        params: { perceptionThreshold: -10, invocationThreshold: 0, γ: 0.1, β_base: 1.0 },
+                        desc: 'Default behavior'
+                      },
+                      {
+                        name: 'Explorer',
+                        icon: '🧭',
+                        params: { perceptionThreshold: -5, invocationThreshold: 5, γ: 0.4, β_base: 0.5 },
+                        desc: 'High exploration, learns new areas'
+                      },
+                    ].map((archetype) => (
+                      <button
+                        key={archetype.name}
+                        onClick={() => handleSettingsChange(archetype.params)}
+                        className="flex-1 px-2 py-2 rounded-lg text-xs transition-colors hover:opacity-80"
+                        style={{
+                          background: COLORS.bg.panel,
+                          border: `1px solid ${COLORS.border.subtle}`,
+                          color: COLORS.text.primary,
+                        }}
+                        title={archetype.desc}
+                      >
+                        <div>{archetype.icon}</div>
+                        <div className="mt-1">{archetype.name}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Invocation Threshold */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm" style={{ color: COLORS.text.primary }}>
+                          Invocation Threshold
+                        </span>
+                        <span className="text-xs" style={{ color: COLORS.text.muted }}>
+                          F &gt; {identity.settings?.invocationThreshold ?? 0}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-10}
+                        max={50}
+                        step={1}
+                        value={identity.settings?.invocationThreshold ?? 0}
+                        onChange={(e) => handleSettingsChange({
+                          invocationThreshold: parseInt(e.target.value, 10),
+                        })}
+                        className="w-full"
+                        style={{ accentColor: COLORS.status.healthy }}
+                      />
+                      <div className="flex justify-between text-xs mt-1" style={{ color: COLORS.text.muted }}>
+                        <span>Eager (work on any F)</span>
+                        <span>Reluctant (high F only)</span>
+                      </div>
+                    </div>
+
+                    {/* Perception Threshold */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm" style={{ color: COLORS.text.primary }}>
+                          Perception Threshold
+                        </span>
+                        <span className="text-xs" style={{ color: COLORS.text.muted }}>
+                          F &lt; {identity.settings?.perceptionThreshold ?? -10}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-30}
+                        max={10}
+                        step={1}
+                        value={identity.settings?.perceptionThreshold ?? -10}
+                        onChange={(e) => handleSettingsChange({
+                          perceptionThreshold: parseInt(e.target.value, 10),
+                        })}
+                        className="w-full"
+                        style={{ accentColor: COLORS.status.executing }}
+                      />
+                      <div className="flex justify-between text-xs mt-1" style={{ color: COLORS.text.muted }}>
+                        <span>Rarely scan</span>
+                        <span>Scout (scan eagerly)</span>
+                      </div>
+                    </div>
+
+                    {/* Gamma (Epistemic Weight) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm" style={{ color: COLORS.text.primary }}>
+                          Exploration (γ)
+                        </span>
+                        <span className="text-xs" style={{ color: COLORS.text.muted }}>
+                          {(identity.settings?.γ ?? 0.1).toFixed(2)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={0.5}
+                        step={0.01}
+                        value={identity.settings?.γ ?? 0.1}
+                        onChange={(e) => handleSettingsChange({
+                          γ: parseFloat(e.target.value),
+                        })}
+                        className="w-full"
+                        style={{ accentColor: COLORS.dao.primary }}
+                      />
+                      <div className="flex justify-between text-xs mt-1" style={{ color: COLORS.text.muted }}>
+                        <span>Exploit (known work)</span>
+                        <span>Explore (learn new)</span>
+                      </div>
+                    </div>
+
+                    {/* Beta (Temperature) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm" style={{ color: COLORS.text.primary }}>
+                          Selectivity (β)
+                        </span>
+                        <span className="text-xs" style={{ color: COLORS.text.muted }}>
+                          {(identity.settings?.β_base ?? 1.0).toFixed(1)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={3}
+                        step={0.1}
+                        value={identity.settings?.β_base ?? 1.0}
+                        onChange={(e) => handleSettingsChange({
+                          β_base: parseFloat(e.target.value),
+                        })}
+                        className="w-full"
+                        style={{ accentColor: COLORS.status.warning }}
+                      />
+                      <div className="flex justify-between text-xs mt-1" style={{ color: COLORS.text.muted }}>
+                        <span>Random selection</span>
+                        <span>Greedy (best only)</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

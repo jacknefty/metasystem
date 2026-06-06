@@ -10,7 +10,8 @@ import { emitPerceived, emitResolved, getBalance, getDiagnosis } from './coordin
 import { emitVariety, getResolution, mintCredit, getPendingCredits, getSystemBalance, bitsToAmount } from './coordination/resources/token.js';
 import { createNode, getNode, listNodes, updateSettings } from './identity/node.js';
 import { getBountyPool, getPoolStats, checkClaimability, getReputation } from './coordination/resources/pool.js';
-import { getHomeostatState, runControlTick } from './control/balance/homeostat.js';
+import { runDynamicsControlTick } from './control/balance/homeostat.js';
+import { dynamicsHomeostat } from './control/dynamics/index.js';
 import { executeWork, finalizeWork } from './operation/execute.js';
 import { join } from 'path';
 import { unlinkSync, existsSync } from 'fs';
@@ -479,33 +480,33 @@ async function testControlLoop() {
   });
   await postBounty(workId, 10);
 
-  // Check homeostat - should want to invoke
-  const state1 = await getHomeostatState();
-  console.log('1. Homeostat:', state1.action, '- ratio:', state1.ratio === Infinity ? '∞' : state1.ratio.toFixed(2));
+  // Check dynamics - should want to invoke (F > 0)
+  const state1 = await dynamicsHomeostat();
+  console.log('1. Dynamics:', state1.action, '- F:', state1.F.toFixed(2), 'G:', state1.G.toFixed(2));
 
-  // Run control tick - should assign work
-  const tick = await runControlTick();
-  console.log('2. Invoked:', tick.invocation.invoked.length, 'workers');
-  console.log('   Assigned:', tick.invocation.workAssigned.length, 'work items');
+  // Run dynamics control tick - should assign work
+  const tick = await runDynamicsControlTick();
+  console.log('2. Invoked:', tick.invocationResult?.invoked.length ?? 0, 'workers');
+  console.log('   Assigned:', tick.invocationResult?.workAssigned.length ?? 0, 'work items');
 
   // Execute and finalize
-  if (tick.invocation.workAssigned.length > 0) {
-    const assignment = tick.invocation.workAssigned[0];
+  if (tick.invocationResult?.workAssigned.length) {
+    const assignment = tick.invocationResult.workAssigned[0];
     const result = await executeWork(assignment.workId, assignment.nodeId);
     console.log('3. Execution:', result.success ? 'success' : 'failed');
 
     await finalizeWork(assignment.workId, true);
   }
 
-  // Check homeostat after - should be balanced
-  const state2 = await getHomeostatState();
-  console.log('4. After completion:', state2.action, '- ratio:', state2.ratio.toFixed(2));
+  // Check dynamics after - should be balanced (F ~ 0)
+  const state2 = await dynamicsHomeostat();
+  console.log('4. After completion:', state2.action, '- F:', state2.F.toFixed(2));
 
   cleanupTestChain();
 
-  return state1.shouldInvoke &&
-         tick.invocation.workAssigned.length === 1 &&
-         state2.ratio === 1.0;
+  return state1.action === 'invoke' &&
+         (tick.invocationResult?.workAssigned.length ?? 0) === 1 &&
+         state2.F === 0;
 }
 
 async function main() {

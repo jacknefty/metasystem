@@ -178,38 +178,8 @@ export async function hasRemote(cwd: string, remote = 'origin'): Promise<boolean
 
 export async function sync(cwd: string, remote = 'origin', branch = 'main'): Promise<boolean> {
   await git(`fetch ${remote}`, cwd);
-  const result = await git(`pull ${remote} ${branch} --rebase`, cwd);
+  const result = await git(`pull ${remote} ${branch}`, cwd);
   return result.success;
-}
-
-export async function rebaseBranch(
-  cwd: string,
-  branch: string,
-  onto: string
-): Promise<GitResult & { conflictFiles?: string[] }> {
-  const checkoutResult = await git(`checkout "${branch}"`, cwd);
-  if (!checkoutResult.success) {
-    return { ...checkoutResult, error: `Failed to checkout ${branch}: ${checkoutResult.error}` };
-  }
-
-  const result = await git(`rebase ${onto}`, cwd);
-
-  if (!result.success) {
-    const status = await git('status --porcelain', cwd);
-    const conflictFiles = status.output
-      .split('\n')
-      .filter(line => line.startsWith('UU ') || line.startsWith('AA ') || line.startsWith('DD '))
-      .map(line => line.slice(3).trim());
-
-    await git('rebase --abort', cwd);
-
-    return {
-      ...result,
-      conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
-    };
-  }
-
-  return result;
 }
 
 export async function createPR(
