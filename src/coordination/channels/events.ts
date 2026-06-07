@@ -57,11 +57,13 @@ export type EventType =
   | 'credit:minted'
   // Bridge (On-chain)
   | 'credit:created'
+  | 'credit:committed'    // credit assigned to Merkle batch
   | 'credit:challenged'
   | 'credit:disputed'
   | 'credit:confirmed'
   | 'credits:minted'
   | 'challenge:failed'
+  | 'merkle:committed'    // Merkle root committed (batch of credits)
   // DAO Registry
   | 'dao:registered'
   | 'dao:updated'
@@ -242,7 +244,9 @@ export interface EventPayloads {
     bits: number;
     workId?: string;
     conditionId?: string;
-    context?: string;
+    context?: string;      // descriptive label
+    contextId?: string;    // scope identifier
+    daoAddress?: string;   // DAO scope identifier
   };
 
   'variety:work:out': {
@@ -250,36 +254,50 @@ export interface EventPayloads {
     workId?: string;
     conditionId?: string;
     context?: string;
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'variety:env:in': {
     bits: number;
     context?: string;
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'variety:env:out': {
     bits: number;
     context?: string;
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'variety:coord:in': {
     bits: number;
     context?: string;
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'variety:coord:out': {
     bits: number;
     context?: string;
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'variety:identity:in': {
     bits: number;
     context?: string;
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'variety:identity:out': {
     bits: number;
     context?: string;
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'credit:earned': {
@@ -407,6 +425,18 @@ export interface EventPayloads {
     challengeId: string;
     creditId: string;
     reason: string;
+  };
+
+  'credit:committed': {
+    merkleRoot: string;
+    committedAt: number;
+  };
+
+  'merkle:committed': {
+    creditIds: string[];
+    root: string;
+    leafCount: number;
+    committedAt: number;
   };
 
   'dao:registered': {

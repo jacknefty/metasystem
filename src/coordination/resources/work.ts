@@ -111,7 +111,11 @@ export async function postBounty(
   });
 
   // Emit perceived variety — work posted = uncertainty perceived
-  await emitPerceived(work.ownerId, workId, bountyAmount, 'work posted');
+  await emitPerceived(work.ownerId, workId, bountyAmount, {
+    context: 'work posted',
+    contextId: work.contextId,
+    daoAddress: work.daoAddress,
+  });
 }
 
 export async function getActiveWorkCount(nodeId: string): Promise<number> {
@@ -245,7 +249,12 @@ export async function completeWork(workId: string): Promise<void> {
 
   // P0 Fix: Close the variety loop — emit resolution
   if (bountyAmount > 0) {
-    await emitResolved(nodeId, workId, bountyAmount, workId, work.contextId);
+    await emitResolved(nodeId, workId, bountyAmount, {
+      workId,
+      context: 'work completed',
+      contextId: work.contextId,
+      daoAddress: work.daoAddress,
+    });
   }
 
   runVerificationAsync(workId, nodeId);

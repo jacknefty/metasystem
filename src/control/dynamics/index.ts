@@ -22,6 +22,11 @@ export {
   interpolateG,
   clearFreeEnergyCache,
   invalidateFreeEnergy,
+  // Fix 2: Aggregated F with local/children/total breakdown
+  getFreeEnergyAggregate,
+  clearAggregateCache,
+  invalidateAggregateCache,
+  type FreeEnergyAggregateState,
   // Legacy aliases
   gradientFreeEnergy,
   sampleFreeEnergyLandscape,

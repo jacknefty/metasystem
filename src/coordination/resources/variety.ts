@@ -10,23 +10,38 @@ import { emitVariety, getSystemBalance, queryTokens, type SystemBalance } from '
 
 export type SystemVarietyBalance = SystemBalance;
 
+export interface VarietyOptions {
+  context?: string;      // descriptive label ("work posted", "scan complete")
+  contextId?: string;    // scope identifier for filtering
+  daoAddress?: string;   // DAO scope identifier
+  workId?: string;       // for resolved variety
+}
+
 export async function emitPerceived(
   emitter: string,
   subject: string,
   bits: number,
-  context?: string
+  opts?: VarietyOptions
 ): Promise<void> {
-  await emitVariety('env', 'in', emitter, subject, bits, { context });
+  await emitVariety('env', 'in', emitter, subject, bits, {
+    context: opts?.context,
+    contextId: opts?.contextId,
+    daoAddress: opts?.daoAddress,
+  });
 }
 
 export async function emitResolved(
   emitter: string,
   subject: string,
   bits: number,
-  workId?: string,
-  context?: string
+  opts?: VarietyOptions
 ): Promise<void> {
-  await emitVariety('work', 'out', emitter, subject, bits, { workId, context });
+  await emitVariety('work', 'out', emitter, subject, bits, {
+    workId: opts?.workId,
+    context: opts?.context,
+    contextId: opts?.contextId,
+    daoAddress: opts?.daoAddress,
+  });
 }
 
 export async function getBalance(): Promise<SystemBalance> {

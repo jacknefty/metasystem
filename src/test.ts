@@ -295,8 +295,8 @@ async function testVariety() {
   setupTestChain();
 
   // Emit perceived variety
-  await emitPerceived('system', 'work-1', 50, 'work created');
-  await emitPerceived('system', 'work-2', 30, 'work created');
+  await emitPerceived('system', 'work-1', 50, { context: 'work created' });
+  await emitPerceived('system', 'work-2', 30, { context: 'work created' });
   console.log('1. Emitted 80 bits perceived');
 
   // Check balance (unresolved)
@@ -306,12 +306,12 @@ async function testVariety() {
   console.log('   Diagnosis:', getDiagnosis(balance));
 
   // Resolve some variety
-  await emitResolved('worker-1', 'work-1', 50, 'work-1', 'work completed');
+  await emitResolved('worker-1', 'work-1', 50, { workId: 'work-1', context: 'work completed' });
   balance = await getBalance();
   console.log('3. After resolving 50:', balance.ratio.toFixed(2));
 
   // Resolve remaining
-  await emitResolved('worker-1', 'work-2', 30, 'work-2', 'work completed');
+  await emitResolved('worker-1', 'work-2', 30, { workId: 'work-2', context: 'work completed' });
   balance = await getBalance();
   console.log('4. Final balance:', balance.ratio.toFixed(2), 'healthy:', balance.healthy);
 

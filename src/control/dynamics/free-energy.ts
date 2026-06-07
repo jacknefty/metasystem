@@ -15,7 +15,7 @@ import { getSystemBalance } from '../../coordination/resources/token.js';
 import { parseVerifier } from '../verify/registry.js';
 import { listContexts } from '../../identity/context.js';
 import type { Scope, FreeEnergyState, Configuration, Vector, DynamicsParameters } from './types.js';
-import { scopeKey, DEFAULT_PARAMETERS } from './types.js';
+import { scopeKey, getParentScope, DEFAULT_PARAMETERS } from './types.js';
 import { getPrecision } from './precision.js';
 
 // Cache for computed F values (short TTL)
@@ -408,4 +408,157 @@ export function clearFreeEnergyCache(): void {
 
 export function invalidateFreeEnergy(scope: Scope): void {
   fCache.delete(scopeKey(scope));
+}
+
+// =============================================================================
+// Aggregated Free Energy (Fix 2: F Propagation)
+// =============================================================================
+
+/**
+ * Decomposed free energy state showing local vs children contribution.
+ * New interface — does not replace existing FreeEnergyState.
+ */
+export interface FreeEnergyAggregateState {
+  scope: Scope;
+  F_local: number;      // This scope's own variety (perceived - resolved)
+  F_children: number;   // Sum of children's F_total
+  F_total: number;      // F_local + F_children
+  childCount: number;
+  computedAt: number;
+}
+
+const aggregateCache = new Map<string, { state: FreeEnergyAggregateState; computedAt: number }>();
+
+/**
+ * Get decomposed free energy with local/children/total breakdown.
+ * New function for Fix 2 — existing getFreeEnergy/getFreeEnergyState unchanged.
+ */
+export async function getFreeEnergyAggregate(scope: Scope): Promise<FreeEnergyAggregateState> {
+  const key = scopeKey(scope);
+  const cached = aggregateCache.get(key);
+
+  if (cached && Date.now() - cached.computedAt < CACHE_TTL) {
+    return cached.state;
+  }
+
+  const state = await computeAggregateState(scope);
+  aggregateCache.set(key, { state, computedAt: Date.now() });
+
+  return state;
+}
+
+async function computeAggregateState(scope: Scope): Promise<FreeEnergyAggregateState> {
+  // Get local F from scoped variety balance
+  const F_local = await computeLocalF(scope);
+
+  // Get children's F (sum, not average)
+  const children = await getChildScopes(scope);
+  let F_children = 0;
+
+  for (const child of children) {
+    const childState = await getFreeEnergyAggregate(child);
+    F_children += childState.F_total;
+  }
+
+  return {
+    scope,
+    F_local,
+    F_children,
+    F_total: F_local + F_children,
+    childCount: children.length,
+    computedAt: Date.now(),
+  };
+}
+
+async function computeLocalF(scope: Scope): Promise<number> {
+  // Import here to avoid circular dependency
+  const { getScopedBalance } = await import('../../coordination/resources/token.js');
+
+  switch (scope.level) {
+    case 'condition':
+      return computeConditionF(scope.id, scope.workId);
+    case 'work':
+      // Work's local F = 0, all F comes from conditions (children)
+      return 0;
+    case 'context': {
+      const balance = await getScopedBalance({
+        level: 'context',
+        id: scope.id,
+        address: scope.daoAddress,
+      });
+      return balance.perceived - balance.resolved;
+    }
+    case 'dao': {
+      const balance = await getScopedBalance({
+        level: 'dao',
+        address: scope.address,
+      });
+      return balance.perceived - balance.resolved;
+    }
+    case 'node':
+    case 'network': {
+      const balance = await getScopedBalance({ level: scope.level });
+      return balance.perceived - balance.resolved;
+    }
+  }
+}
+
+async function getChildScopes(scope: Scope): Promise<Scope[]> {
+  switch (scope.level) {
+    case 'network': {
+      // Children are all DAOs
+      const events = await getChain().recall({ type: 'dao:registered' });
+      return events.map(e => ({ level: 'dao', address: e.subject } as Scope));
+    }
+    case 'dao': {
+      // Children are contexts in this DAO
+      const contexts = listContexts(scope.address);
+      return contexts.map(c => ({
+        level: 'context',
+        id: c.frontmatter.id,
+        daoAddress: scope.address,
+      } as Scope));
+    }
+    case 'context': {
+      // Children are work items in this context
+      const workItems = await listWork({ contextId: scope.id });
+      return workItems
+        .filter(w => w.status !== 'fulfilled')
+        .map(w => ({
+          level: 'work',
+          id: w.id,
+          contextId: scope.id,
+          daoAddress: scope.daoAddress,
+        } as Scope));
+    }
+    case 'work': {
+      // Children are conditions
+      const work = await getWork(scope.id);
+      if (!work) return [];
+      return work.conditions.map(c => ({
+        level: 'condition',
+        id: c.id,
+        workId: scope.id,
+        contextId: scope.contextId,
+        daoAddress: scope.daoAddress,
+      } as Scope));
+    }
+    case 'node':
+    case 'condition':
+      // Leaf nodes have no children
+      return [];
+  }
+}
+
+export function clearAggregateCache(): void {
+  aggregateCache.clear();
+}
+
+export function invalidateAggregateCache(scope: Scope): void {
+  // Invalidate this scope and all ancestors
+  let current: Scope | null = scope;
+  while (current) {
+    aggregateCache.delete(scopeKey(current));
+    current = getParentScope(current);
+  }
 }

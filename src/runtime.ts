@@ -21,11 +21,13 @@ import { mcpProvider, connectAll as connectMCP } from './tools/mcp/index.js';
 import { loadStats as loadToolStats } from './tools/reliability.js';
 import { runToolAuditPass } from './tools/audit.js';
 import { finalizeProposal } from './coordination/governance/index.js';
+import { maybeCommitMerkleRoot } from './bridge/auto-commit.js';
 import type { ChainEvent } from './coordination/channels/events.js';
 
 let running = false;
 const expiryTimeouts = new Map<string, NodeJS.Timeout>();
 const proposalTimeouts = new Map<string, NodeJS.Timeout>();
+let merkleCommitInterval: NodeJS.Timeout | null = null;
 
 export async function initializeTools(): Promise<void> {
   registerProvider(builtinProvider);
@@ -298,6 +300,18 @@ export function startRuntime(): () => void {
     console.error('[Runtime] Failed to rebuild merge queue:', err);
   });
 
+  // Fix 3: Periodic Merkle root commit (every 30s)
+  merkleCommitInterval = setInterval(async () => {
+    try {
+      const result = await maybeCommitMerkleRoot();
+      if (result.committed) {
+        console.log(`[Bridge] Committed Merkle root: ${result.root} (${result.creditCount} credits)`);
+      }
+    } catch (err) {
+      console.error('[Bridge] Merkle commit failed:', err);
+    }
+  }, 30_000);
+
   console.log('[Runtime] Started (event-driven)');
   console.log('  - variety:env:in → dynamics check + sporadic tool audit');
   console.log('  - work:claimed → execute work');
@@ -311,6 +325,7 @@ export function startRuntime(): () => void {
   console.log('  - algedonic:pain → severity-based action');
   console.log('  - proposal:created → schedule finalization');
   console.log('  - work:created → auto-post bounty');
+  console.log('  - merkle:committed → periodic (30s)');
   console.log('  - tools registered: builtin + MCP');
 
   return () => stopRuntime();
@@ -329,6 +344,11 @@ export function stopRuntime(): void {
     clearTimeout(timeout);
   }
   proposalTimeouts.clear();
+
+  if (merkleCommitInterval) {
+    clearInterval(merkleCommitInterval);
+    merkleCommitInterval = null;
+  }
 
   console.log('[Runtime] Stopped');
 }

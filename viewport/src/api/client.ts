@@ -795,3 +795,133 @@ export async function fetchNetworkMember(address: string): Promise<NetworkMember
   const res = await api.get<NetworkMember>(`/network/member/${address}`);
   return res.data || null;
 }
+
+// =============================================================================
+// Governance API
+// =============================================================================
+
+export interface SystemConstants {
+  dynamics: {
+    β_base: number;
+    γ: number;
+    learningThreshold: number;
+    invocationThreshold: number;
+    perceptionThreshold: number;
+    τChangeThreshold: number;
+    verboseEvents: boolean;
+  };
+  governance: {
+    defaultQuorum: number;
+    votingPeriods: Record<string, number>;
+    thresholdFormula: {
+      baseThreshold: number;
+      scaleFactor: number;
+      maxThreshold: number;
+    };
+    voteFormula: {
+      description: string;
+      γ: number;
+    };
+  };
+  audit: {
+    nodeRate: number;
+    contextRate: number;
+    daoRate: number;
+    lookbackDays: { node: number; context: number; dao: number };
+  };
+  housekeeping: {
+    starvationThresholdMs: number;
+    hoardingThresholdMs: number;
+    minIntervalMs: number;
+  };
+}
+
+export interface VotingPower {
+  identity: string;
+  contribution: number;
+  τ: number;
+  β: number;
+}
+
+export interface Proposal {
+  id: string;
+  type: 'context' | 'work' | 'claim' | 'amendment';
+  scope: { level: string; id?: string; address?: string };
+  proposer: string;
+  target: string;
+  resourcesRequested: number;
+  deadline: number;
+  status: 'open' | 'passed' | 'rejected' | 'expired';
+  createdAt: number;
+}
+
+export interface ApprovalResult {
+  passed: boolean;
+  totalWeight: number;
+  threshold: number;
+  quorum: number;
+  participation: number;
+  forWeight: number;
+  againstWeight: number;
+}
+
+export async function fetchSystemConstants(): Promise<SystemConstants | null> {
+  const res = await api.get<SystemConstants>('/system/constants');
+  return res.data || null;
+}
+
+export async function fetchVotingPower(identity: string, level?: string, id?: string): Promise<VotingPower | null> {
+  let query = '';
+  if (level) {
+    query = `?level=${level}`;
+    if (id) query += `&id=${encodeURIComponent(id)}`;
+  }
+  const res = await api.get<VotingPower>(`/voting-power/${encodeURIComponent(identity)}${query}`);
+  return res.data || null;
+}
+
+export async function fetchProposals(scope?: { level: string; id?: string }): Promise<Proposal[]> {
+  let query = '';
+  if (scope) {
+    query = `?level=${scope.level}`;
+    if (scope.id) query += `&id=${encodeURIComponent(scope.id)}`;
+  }
+  const res = await api.get<Proposal[]>(`/proposals${query}`);
+  return res.data || [];
+}
+
+export async function fetchProposalApproval(proposalId: string): Promise<ApprovalResult | null> {
+  const res = await api.get<ApprovalResult>(`/proposals/${proposalId}/approval`);
+  return res.data || null;
+}
+
+export async function fetchDelegations(identity: string): Promise<Array<{ to: string; weight: number }>> {
+  const res = await api.get<Array<{ to: string; weight: number }>>(`/delegations/${encodeURIComponent(identity)}`);
+  return res.data || [];
+}
+
+// =============================================================================
+// Fix 2: Aggregated Free Energy
+// =============================================================================
+
+export interface FreeEnergyAggregateState {
+  scope: { level: string; id?: string; address?: string };
+  F_local: number;
+  F_children: number;
+  F_total: number;
+  childCount: number;
+  computedAt: number;
+}
+
+export async function fetchFreeEnergyAggregate(
+  level: string,
+  id?: string,
+  address?: string
+): Promise<FreeEnergyAggregateState | null> {
+  const params = new URLSearchParams({ level });
+  if (id) params.set('id', id);
+  if (address) params.set('address', address);
+
+  const res = await api.get<FreeEnergyAggregateState>(`/dynamics/free-energy/aggregate?${params}`);
+  return res.data || null;
+}

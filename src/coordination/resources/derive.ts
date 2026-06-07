@@ -68,6 +68,7 @@ export interface DerivedWork {
   name: string;
   contextId: string;
   contextPath?: string;  // optional - can be resolved from context node at execution time
+  daoAddress?: string;   // DAO scope identifier for variety accounting
   ownerId: string;
   status: WorkStatus;
   conditions: DerivedCondition[];
@@ -211,6 +212,7 @@ export function deriveWork(events: ChainEvent[]): DerivedWork | null {
           name: p.name,
           contextId: p.contextId,
           contextPath: p.contextPath,
+          daoAddress: p.daoAddress,
           ownerId: event.emitter,
           status: p.dependsOn?.length ? 'blocked' : 'active',
           conditions,

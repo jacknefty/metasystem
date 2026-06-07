@@ -37,6 +37,8 @@ import { getBohmianState, getS4Field } from './intelligence/model/bohmian/index.
 import { perceiveEnvironment } from './intelligence/perceive/scan.js';
 import * as tools from './tools/index.js';
 import { checkToolHealth } from './tools/reliability.js';
+import { DEFAULT_PARAMETERS } from './control/dynamics/types.js';
+import { DEFAULT_QUORUM, DEFAULT_VOTING_PERIODS } from './coordination/governance/types.js';
 
 const app = express();
 app.use(cors());
@@ -968,6 +970,32 @@ app.get('/api/dynamics/free-energy', wrap(async (req, res) => {
   res.json(state);
 }));
 
+// Fix 2: Aggregated F with local/children/total breakdown
+app.get('/api/dynamics/free-energy/aggregate', wrap(async (req, res) => {
+  const { level, id, address } = req.query;
+
+  let scope: dynamics.Scope;
+  switch (level) {
+    case 'network':
+      scope = { level: 'network' };
+      break;
+    case 'dao':
+      scope = { level: 'dao', address: str(address) };
+      break;
+    case 'context':
+      scope = { level: 'context', id: str(id) };
+      break;
+    case 'work':
+      scope = { level: 'work', id: str(id), contextId: str(req.query.contextId) };
+      break;
+    default:
+      scope = { level: 'network' };
+  }
+
+  const state = await dynamics.getFreeEnergyAggregate(scope);
+  res.json(state);
+}));
+
 app.get('/api/dynamics/field', wrap(async (req, res) => {
   const scope = req.query.scope ? JSON.parse(String(req.query.scope)) : { level: 'network' };
   res.json(await dynamics.buildS4Field(scope));
@@ -1353,6 +1381,37 @@ app.get('/api/security/context', wrap(async (req, res) => {
   } else {
     res.status(404).json({ error: 'No active security context' });
   }
+}));
+
+// --- System Constants ---
+app.get('/api/system/constants', wrap(async (req, res) => {
+  res.json({
+    dynamics: DEFAULT_PARAMETERS,
+    governance: {
+      defaultQuorum: DEFAULT_QUORUM,
+      votingPeriods: DEFAULT_VOTING_PERIODS,
+      thresholdFormula: {
+        baseThreshold: 0.5,
+        scaleFactor: 0.3,
+        maxThreshold: 0.95,
+      },
+      voteFormula: {
+        description: 'weight = (2ψ - 1) × contribution × τ; ψ = 1/(1+exp(β×G)); G = F + γH',
+        γ: 0.3,
+      },
+    },
+    audit: {
+      nodeRate: 0.1,
+      contextRate: 0.05,
+      daoRate: 0.02,
+      lookbackDays: { node: 14, context: 7, dao: 7 },
+    },
+    housekeeping: {
+      starvationThresholdMs: 10 * 60 * 1000,
+      hoardingThresholdMs: 60 * 60 * 1000,
+      minIntervalMs: 60 * 1000,
+    },
+  });
 }));
 
 app.get('/api/network/status', wrap(async (req, res) => {
