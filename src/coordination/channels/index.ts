@@ -1,7 +1,30 @@
-export * from './chain.js';
-export * from './events.js';
-export * from './algedonic.js';
-export * from './backend.js';
-export * from './composite.js';
-export * from './local/index.js';
-export * from './network/index.js';
+/**
+ * Channels — Public API
+ *
+ * Chain access and event types.
+ */
+
+// Chain access (primary interface)
+export { getChain, setChain, LocalChain } from './chain.js';
+export type { ChainBackend, EventFilter } from './backend.js';
+
+// Event types (needed for type checking)
+export type {
+  ChainEvent,
+  EventType,
+  EventPayloads,
+  Condition,
+  Bounty,
+  WorkContract,
+} from './events.js';
+export { createEvent, isEventType } from './events.js';
+
+// Algedonic signals
+export {
+  emitPain,
+  emitPleasure,
+  acknowledgePain,
+  getPendingSignals,
+  getAllSignals,
+  type AlgedonicSignal,
+} from './algedonic.js';

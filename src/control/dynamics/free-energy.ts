@@ -250,7 +250,7 @@ async function computeDaoF(daoAddress: string): Promise<number> {
     totalF += contextF;
   }
 
-  return totalF / contexts.length;
+  return totalF; // Sum, not average — variety adds
 }
 
 /**

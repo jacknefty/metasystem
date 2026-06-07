@@ -39,6 +39,7 @@ import { ChatPanel } from './ChatPanel';
 import { WaveGraph } from './WaveGraph';
 import { AuditPanel } from './AuditPanel';
 import { BountyPanel } from './BountyPanel';
+import { GovernancePanel } from './GovernancePanel';
 
 interface FocusPanelProps {
   nodeId: string;
@@ -75,7 +76,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
   const [joinLoading, setJoinLoading] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'chat' | 'wave' | 'particle' | 'identity' | 'overview' | 'work' | 'settings' | 'audits' | 'bounties'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'wave' | 'particle' | 'identity' | 'overview' | 'work' | 'settings' | 'audits' | 'bounties' | 'governance'>('chat');
 
   // Attestation modal state
   const [attestationTarget, setAttestationTarget] = useState<{
@@ -166,6 +167,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
   // Different tabs for DAOs vs local identities
   const tabs = isDAO ? [
     { id: 'identity', label: 'Identity' },
+    { id: 'governance', label: 'Governance' },
     { id: 'audits', label: 'Audits' },
     { id: 'overview', label: 'Overview' },
   ] as const : [
@@ -173,6 +175,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
     { id: 'wave', label: 'Wave' },
     { id: 'particle', label: 'Particle' },
     { id: 'identity', label: 'Identity' },
+    { id: 'governance', label: 'Governance' },
     { id: 'bounties', label: 'Bounties' },
     { id: 'work', label: `Work (${work.length})` },
     { id: 'settings', label: 'Settings' },
@@ -282,6 +285,12 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
         {activeTab === 'particle' && (
           <div className="h-full -mx-5 -mb-5" style={{ minHeight: 400 }}>
             <WaveGraph projectId={nodeId} />
+          </div>
+        )}
+
+        {activeTab === 'governance' && (
+          <div className="h-full -mx-5 -mb-5 overflow-auto">
+            <GovernancePanel nodeId={nodeId} />
           </div>
         )}
 
@@ -1083,21 +1092,51 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
 
             {activeTab === 'settings' && identity && (
               <div className="space-y-6">
-                {/* Autonomous Mode Toggle */}
+                {/* Variety Controls Header */}
+                <div
+                  className="p-4 rounded-lg"
+                  style={{
+                    background: `${COLORS.s5.primary}08`,
+                    border: `1px solid ${COLORS.s5.border}`,
+                  }}
+                >
+                  <div className="text-sm font-medium mb-2" style={{ color: COLORS.s5.text }}>
+                    Variety Engineering Controls
+                  </div>
+                  <div className="text-xs" style={{ color: COLORS.text.muted }}>
+                    These settings control how this node absorbs, attenuates, and transduces variety.
+                    The governance tab shows the fixed formulas; here you tune the inputs.
+                  </div>
+                </div>
+
+                {/* === GATES: What variety can flow === */}
                 <div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div
-                        className="text-sm font-medium"
-                        style={{ color: COLORS.text.primary }}
-                      >
-                        Autonomous Mode
-                      </div>
-                      <div
-                        className="text-xs mt-1"
-                        style={{ color: COLORS.text.muted }}
-                      >
-                        Skip permission prompts for file operations
+                  <div
+                    className="text-xs uppercase tracking-wide mb-3 flex items-center gap-2"
+                    style={{ color: COLORS.text.muted }}
+                  >
+                    <span>Gates</span>
+                    <span className="text-xs normal-case" style={{ color: COLORS.text.muted }}>— on/off flow control</span>
+                  </div>
+
+                  {/* Autonomous Mode */}
+                  <div
+                    className="p-3 rounded-lg mb-3"
+                    style={{ background: COLORS.bg.elevated }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div
+                          className="text-sm font-medium"
+                          style={{ color: COLORS.text.primary }}
+                        >
+                          Autonomous Mode
+                        </div>
+                        <div
+                          className="text-xs mt-1"
+                          style={{ color: COLORS.text.muted }}
+                        >
+                          Skip permission prompts for file operations
                       </div>
                     </div>
                     <button
@@ -1134,158 +1173,200 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                 </div>
 
                 {/* Available for Work */}
-                <div
-                  className="p-3 rounded-lg"
-                  style={{ background: COLORS.bg.elevated }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div style={{ color: COLORS.text.primary }}>
-                        Available for Bounties
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ background: COLORS.bg.elevated }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div style={{ color: COLORS.text.primary }}>
+                          Available for Bounties
+                        </div>
+                        <div
+                          className="text-xs mt-1"
+                          style={{ color: COLORS.text.muted }}
+                        >
+                          Allow S3 to auto-assign bounties to this node
+                        </div>
                       </div>
-                      <div
-                        className="text-xs mt-1"
-                        style={{ color: COLORS.text.muted }}
-                      >
-                        Allow S3 to auto-assign bounties to this node
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleSettingsChange({
-                        availableForWork: !(identity.settings?.availableForWork ?? true),
-                      })}
-                      className="relative w-12 h-6 rounded-full transition-colors"
-                      style={{
-                        background: (identity.settings?.availableForWork ?? true)
-                          ? COLORS.status.healthy
-                          : COLORS.bg.panel,
-                      }}
-                    >
-                      <div
-                        className="absolute w-5 h-5 rounded-full bg-white transition-transform"
+                      <button
+                        onClick={() => handleSettingsChange({
+                          availableForWork: !(identity.settings?.availableForWork ?? true),
+                        })}
+                        className="relative w-12 h-6 rounded-full transition-colors"
                         style={{
-                          top: 2,
-                          left: (identity.settings?.availableForWork ?? true) ? 26 : 2,
+                          background: (identity.settings?.availableForWork ?? true)
+                            ? COLORS.status.healthy
+                            : COLORS.bg.panel,
                         }}
-                      />
-                    </button>
+                      >
+                        <div
+                          className="absolute w-5 h-5 rounded-full bg-white transition-transform"
+                          style={{
+                            top: 2,
+                            left: (identity.settings?.availableForWork ?? true) ? 26 : 2,
+                          }}
+                        />
+                      </button>
+                    </div>
+                    {!(identity.settings?.availableForWork ?? true) && (
+                      <div
+                        className="mt-2 p-2 rounded text-xs"
+                        style={{
+                          background: `${COLORS.status.warning}15`,
+                          color: COLORS.status.warning,
+                        }}
+                      >
+                        This node won't be auto-assigned bounties (can still claim manually)
+                      </div>
+                    )}
                   </div>
-                  {!(identity.settings?.availableForWork ?? true) && (
-                    <div
-                      className="mt-2 p-2 rounded text-xs"
+
+                  {/* Security Mode - also a gate */}
+                  <div className="mt-3">
+                    <div className="text-sm mb-2" style={{ color: COLORS.text.primary }}>
+                      Security Mode
+                    </div>
+                    <select
+                      value={identity.settings?.securityMode || 'advisory'}
+                      onChange={(e) => handleSettingsChange({
+                        securityMode: e.target.value as 'advisory' | 'enforced' | 'signed',
+                      })}
+                      className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                       style={{
-                        background: `${COLORS.status.warning}15`,
-                        color: COLORS.status.warning,
+                        background: COLORS.bg.panel,
+                        border: `1px solid ${COLORS.border.subtle}`,
+                        color: COLORS.text.primary,
                       }}
                     >
-                      This node won't be auto-assigned bounties (can still claim manually)
+                      <option value="advisory">Advisory — log but don't block</option>
+                      <option value="enforced">Enforced — block scope violations</option>
+                      <option value="signed">Signed — cryptographic tokens (network)</option>
+                    </select>
+                    <div className="text-xs mt-1" style={{ color: COLORS.text.muted }}>
+                      Controls scope boundary enforcement
                     </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* Security Mode */}
+                {/* === ATTENUATORS: Reduce incoming variety === */}
                 <div>
                   <div
-                    className="text-xs uppercase tracking-wide mb-2"
+                    className="text-xs uppercase tracking-wide mb-3 flex items-center gap-2"
                     style={{ color: COLORS.text.muted }}
                   >
-                    Security Mode
+                    <span>Attenuators</span>
+                    <span className="text-xs normal-case" style={{ color: COLORS.text.muted }}>— reduce incoming variety</span>
                   </div>
-                  <select
-                    value={identity.settings?.securityMode || 'advisory'}
-                    onChange={(e) => handleSettingsChange({
-                      securityMode: e.target.value as 'advisory' | 'enforced' | 'signed',
-                    })}
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{
-                      background: COLORS.bg.panel,
-                      border: `1px solid ${COLORS.border.subtle}`,
-                      color: COLORS.text.primary,
-                    }}
-                  >
-                    <option value="advisory">Advisory — log but don't block</option>
-                    <option value="enforced">Enforced — block scope violations</option>
-                    <option value="signed">Signed — cryptographic tokens (network)</option>
-                  </select>
+
+                  {/* Max Attempts */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm" style={{ color: COLORS.text.primary }}>
+                        Max Attempts
+                      </span>
+                      <span className="text-xs font-mono" style={{ color: COLORS.text.muted }}>
+                        {identity.settings?.maxAttempts || 3}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      value={identity.settings?.maxAttempts || 3}
+                      onChange={(e) => handleSettingsChange({
+                        maxAttempts: parseInt(e.target.value, 10) || 3,
+                      })}
+                      className="w-full"
+                      style={{ accentColor: COLORS.status.warning }}
+                    />
+                    <div className="flex justify-between text-xs mt-1" style={{ color: COLORS.text.muted }}>
+                      <span>Fail fast</span>
+                      <span>Persist (more retries)</span>
+                    </div>
+                  </div>
+
+                  {/* Confidence Threshold */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm" style={{ color: COLORS.text.primary }}>
+                        Confidence Threshold
+                      </span>
+                      <span className="text-xs font-mono" style={{ color: COLORS.text.muted }}>
+                        {((identity.settings?.confidenceThreshold ?? 0.7) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.3}
+                      max={1.0}
+                      step={0.05}
+                      value={identity.settings?.confidenceThreshold ?? 0.7}
+                      onChange={(e) => handleSettingsChange({
+                        confidenceThreshold: parseFloat(e.target.value),
+                      })}
+                      className="w-full"
+                      style={{ accentColor: COLORS.status.healthy }}
+                    />
+                    <div className="flex justify-between text-xs mt-1" style={{ color: COLORS.text.muted }}>
+                      <span>Trust more (auto-verify)</span>
+                      <span>Skeptical (require attestation)</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Executor Selection */}
+                {/* === TRANSDUCERS: Transform variety === */}
                 <div>
                   <div
-                    className="text-xs uppercase tracking-wide mb-2"
+                    className="text-xs uppercase tracking-wide mb-3 flex items-center gap-2"
                     style={{ color: COLORS.text.muted }}
                   >
-                    Executor
+                    <span>Transducers</span>
+                    <span className="text-xs normal-case" style={{ color: COLORS.text.muted }}>— transform variety</span>
                   </div>
-                  <select
-                    value={identity.settings?.executor || 'claude'}
-                    onChange={(e) => handleSettingsChange({ executor: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{
-                      background: COLORS.bg.panel,
-                      border: `1px solid ${COLORS.border.subtle}`,
-                      color: COLORS.text.primary,
-                    }}
-                  >
-                    {executors.map((ex) => (
-                      <option
-                        key={ex.name}
-                        value={ex.name}
-                        disabled={!ex.installed}
-                      >
-                        {ex.name} — {ex.description} {!ex.installed && '(not installed)'}
-                      </option>
-                    ))}
-                  </select>
-                  <div
-                    className="mt-2 text-xs"
-                    style={{ color: COLORS.text.muted }}
-                  >
-                    The AI agent used for work execution
+
+                  {/* Executor Selection */}
+                  <div>
+                    <div className="text-sm mb-2" style={{ color: COLORS.text.primary }}>
+                      Executor
+                    </div>
+                    <select
+                      value={identity.settings?.executor || 'claude'}
+                      onChange={(e) => handleSettingsChange({ executor: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                      style={{
+                        background: COLORS.bg.panel,
+                        border: `1px solid ${COLORS.border.subtle}`,
+                        color: COLORS.text.primary,
+                      }}
+                    >
+                      {executors.map((ex) => (
+                        <option
+                          key={ex.name}
+                          value={ex.name}
+                          disabled={!ex.installed}
+                        >
+                          {ex.name} — {ex.description} {!ex.installed && '(not installed)'}
+                        </option>
+                      ))}
+                    </select>
+                    <div
+                      className="mt-2 text-xs"
+                      style={{ color: COLORS.text.muted }}
+                    >
+                      Different executors have different variety-handling capacity
+                    </div>
                   </div>
                 </div>
 
-                {/* Max Attempts */}
+                {/* === BALANCE: Exploration vs Exploitation === */}
                 <div>
                   <div
-                    className="text-xs uppercase tracking-wide mb-2"
+                    className="text-xs uppercase tracking-wide mb-3 flex items-center gap-2"
                     style={{ color: COLORS.text.muted }}
                   >
-                    Max Attempts
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={identity.settings?.maxAttempts || 3}
-                    onChange={(e) => handleSettingsChange({
-                      maxAttempts: parseInt(e.target.value, 10) || 3,
-                    })}
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{
-                      background: COLORS.bg.panel,
-                      border: `1px solid ${COLORS.border.subtle}`,
-                      color: COLORS.text.primary,
-                    }}
-                  />
-                  <div
-                    className="mt-2 text-xs"
-                    style={{ color: COLORS.text.muted }}
-                  >
-                    How many times to retry work before giving up
-                  </div>
-                </div>
-
-                {/* Dynamics Parameters */}
-                <div
-                  className="pt-4 mt-4"
-                  style={{ borderTop: `1px solid ${COLORS.border.subtle}` }}
-                >
-                  <div
-                    className="text-xs uppercase tracking-wide mb-3"
-                    style={{ color: COLORS.text.muted }}
-                  >
-                    Dynamics (Control Loop)
+                    <span>Balance</span>
+                    <span className="text-xs normal-case" style={{ color: COLORS.text.muted }}>— exploration vs exploitation</span>
                   </div>
 
                   {/* Archetype Presets */}
