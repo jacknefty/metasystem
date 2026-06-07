@@ -22,12 +22,14 @@ import { loadStats as loadToolStats } from './tools/reliability.js';
 import { runToolAuditPass } from './tools/audit.js';
 import { finalizeProposal } from './coordination/governance/index.js';
 import { maybeCommitMerkleRoot } from './bridge/auto-commit.js';
+import { checkIdentityRoot } from './identity/sync.js';
 import type { ChainEvent } from './coordination/channels/events.js';
 
 let running = false;
 const expiryTimeouts = new Map<string, NodeJS.Timeout>();
 const proposalTimeouts = new Map<string, NodeJS.Timeout>();
 let merkleCommitInterval: NodeJS.Timeout | null = null;
+let identityRootInterval: NodeJS.Timeout | null = null;
 
 export async function initializeTools(): Promise<void> {
   registerProvider(builtinProvider);
@@ -312,6 +314,23 @@ export function startRuntime(): () => void {
     }
   }, 30_000);
 
+  // Identity root sync (every 60s)
+  identityRootInterval = setInterval(async () => {
+    try {
+      const result = await checkIdentityRoot();
+      if (result.changed) {
+        console.log(`[Identity] Root changed: ${result.root.slice(0, 8)}... (${result.leafCount} identities)`);
+      }
+    } catch (err) {
+      console.error('[Identity] Root check failed:', err);
+    }
+  }, 60_000);
+
+  // Initial identity root check
+  checkIdentityRoot().catch(err => {
+    console.error('[Identity] Initial root check failed:', err);
+  });
+
   console.log('[Runtime] Started (event-driven)');
   console.log('  - variety:env:in → dynamics check + sporadic tool audit');
   console.log('  - work:claimed → execute work');
@@ -326,6 +345,7 @@ export function startRuntime(): () => void {
   console.log('  - proposal:created → schedule finalization');
   console.log('  - work:created → auto-post bounty');
   console.log('  - merkle:committed → periodic (30s)');
+  console.log('  - identity:root:changed → periodic (60s)');
   console.log('  - tools registered: builtin + MCP');
 
   return () => stopRuntime();
@@ -348,6 +368,11 @@ export function stopRuntime(): void {
   if (merkleCommitInterval) {
     clearInterval(merkleCommitInterval);
     merkleCommitInterval = null;
+  }
+
+  if (identityRootInterval) {
+    clearInterval(identityRootInterval);
+    identityRootInterval = null;
   }
 
   console.log('[Runtime] Stopped');

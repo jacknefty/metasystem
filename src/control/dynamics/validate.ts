@@ -282,7 +282,7 @@ export async function validateMerkleTree(): Promise<ValidationResult> {
   };
 
   // Create a credit
-  const credit = await createCredit('test_work', 'test_node', 100n, workProof, scope, params);
+  const credit = await createCredit('test_work', 'test_node', 100n, workProof, scope, '0x0', undefined, undefined, params);
 
   // Get proof
   const proof = getMerkleProof(credit.id);

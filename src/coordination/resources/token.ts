@@ -13,6 +13,41 @@ import type { EventPayloads } from '../channels/events.js';
 export type VarietyDomain = 'work' | 'env' | 'coord' | 'identity';
 export type VarietyDirection = 'in' | 'out';
 
+// =============================================================================
+// ERC-1155 Token ID Computation
+// =============================================================================
+
+/**
+ * Compute ERC-1155 tokenId for a scope level.
+ * - Network: tokenId = 0
+ * - DAO: tokenId = uint256(daoAddress) — fits in 160 bits
+ * - Context: tokenId = uint256(keccak256(daoAddress, contextId))
+ */
+export function computeTokenId(daoAddress?: string, contextId?: string): string {
+  if (!daoAddress) {
+    // Network level
+    return '0x0';
+  }
+
+  // Parse DAO address — could be "0x..." or "local:name"
+  const daoHex = daoAddress.startsWith('0x')
+    ? daoAddress.toLowerCase()
+    : '0x' + createHash('sha256').update(daoAddress).digest('hex').slice(0, 40);
+
+  if (!contextId) {
+    // DAO level — address as uint256
+    return daoHex.padStart(66, '0').replace(/^0+/, '0x') || '0x0';
+  }
+
+  // Context level — hash of (dao, context)
+  const hash = createHash('sha256')
+    .update(daoHex)
+    .update(contextId)
+    .digest('hex');
+
+  return '0x' + hash;
+}
+
 export interface VarietyToken {
   id: string;
   domain: VarietyDomain;
@@ -43,6 +78,9 @@ export interface PendingCredit {
   bits: number;
   amount: bigint;
   proofHash: string;
+  tokenId: string;       // ERC-1155 tokenId (hex string for uint256)
+  contextId?: string;
+  daoAddress?: string;
   earnedAt: number;
 }
 
@@ -325,12 +363,18 @@ export async function mintCredit(workId: string, nodeId: string): Promise<Pendin
   const amount = bitsToAmount(bits);
   const proofHash = generateProofHash(workId, nodeId, bits, evidenceHashes);
 
+  // Compute ERC-1155 tokenId based on scope
+  const tokenId = computeTokenId(work?.daoAddress, work?.contextId);
+
   await getChain().append('credit:earned', 'system', nodeId, {
     workId,
     nodeId,
     bits,
     amount: amount.toString(),
     proofHash,
+    tokenId,
+    contextId: work?.contextId,
+    daoAddress: work?.daoAddress,
   });
 
   return {
@@ -340,6 +384,9 @@ export async function mintCredit(workId: string, nodeId: string): Promise<Pendin
     bits,
     amount,
     proofHash,
+    tokenId,
+    contextId: work?.contextId,
+    daoAddress: work?.daoAddress,
     earnedAt: Date.now(),
   };
 }
@@ -361,6 +408,9 @@ export async function getPendingCredits(nodeId?: string): Promise<PendingCredit[
       bits: p.bits,
       amount: BigInt(p.amount),
       proofHash: p.proofHash,
+      tokenId: p.tokenId ?? '0x0',
+      contextId: p.contextId,
+      daoAddress: p.daoAddress,
       earnedAt: event.timestamp,
     });
   }

@@ -31,6 +31,9 @@ export interface DAORegistration {
   name: string;
   identity: DAOIdentity;
 
+  // On-chain address for ERC-1155 tokenId computation
+  evmAddress?: `0x${string}`;     // Ethereum address (Safe, governance contract, etc.)
+
   // Location (one of these)
   contextPath?: string;           // /Users/lionsmane/Desktop/MetaSystem
   gitRemote?: string;             // git@github.com:org/repo.git

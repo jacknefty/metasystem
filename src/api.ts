@@ -1876,6 +1876,34 @@ app.get('/api/identity/root', wrap(async (req, res) => {
   res.json({ root });
 }));
 
+// Identity root sync
+import { checkIdentityRoot, getIdentityRootHistory, getPendingRootCommits, markRootCommitted } from './identity/sync.js';
+
+app.get('/api/identity/root/status', wrap(async (req, res) => {
+  const state = await checkIdentityRoot();
+  res.json(state);
+}));
+
+app.get('/api/identity/root/history', wrap(async (req, res) => {
+  const history = await getIdentityRootHistory();
+  res.json(history);
+}));
+
+app.get('/api/identity/root/pending', wrap(async (req, res) => {
+  const pending = await getPendingRootCommits();
+  res.json(pending);
+}));
+
+app.post('/api/identity/root/commit', wrap(async (req, res) => {
+  const { root, txHash } = req.body;
+  if (!root || !txHash) {
+    res.status(400).json({ error: 'root and txHash required' });
+    return;
+  }
+  await markRootCommitted(root, txHash);
+  res.json({ committed: true, root, txHash });
+}));
+
 // --- Governance ---
 import * as governance from './coordination/governance/index.js';
 

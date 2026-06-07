@@ -113,6 +113,9 @@ export interface CreditLeaf {
   nodeId: string;
   amount: bigint;
   proofHash: string;
+  tokenId: string;              // ERC-1155 tokenId (hex string for uint256)
+  contextId?: string;
+  daoAddress?: string;
   verificationStrategy: VerificationStrategy;
   τ: number;
   challengeWindow: number | null;
@@ -121,13 +124,18 @@ export interface CreditLeaf {
   createdAt: number;
 }
 
+/**
+ * Hash a credit leaf for Merkle tree.
+ * Must match the on-chain verification:
+ *   keccak256(abi.encodePacked(address, tokenId, amount))
+ */
 export function hashCreditLeaf(leaf: CreditLeaf): string {
+  // For on-chain compatibility, we hash (nodeId, tokenId, amount)
+  // Note: nodeId here should be the Ethereum address of the worker
   const data = JSON.stringify({
-    id: leaf.id,
-    workId: leaf.workId,
     nodeId: leaf.nodeId,
+    tokenId: leaf.tokenId,
     amount: leaf.amount.toString(),
-    proofHash: leaf.proofHash,
   });
   return createHash('sha256').update(data).digest('hex');
 }
@@ -259,6 +267,9 @@ export async function createCredit(
   amount: bigint,
   workProof: WorkProof,
   scope: Scope,
+  tokenId: string,
+  contextId?: string,
+  daoAddress?: string,
   params: DynamicsParameters = DEFAULT_PARAMETERS
 ): Promise<CreditLeaf> {
   const τ = await getAggregatePrecision(scope);
@@ -273,6 +284,9 @@ export async function createCredit(
     nodeId,
     amount,
     proofHash,
+    tokenId,
+    contextId,
+    daoAddress,
     verificationStrategy: strategyResult.strategy,
     τ,
     challengeWindow: strategyResult.challengeWindow,

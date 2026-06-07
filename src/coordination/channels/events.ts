@@ -120,7 +120,10 @@ export type EventType =
   // Audit (S3*)
   | 'audit:node'
   | 'audit:context'
-  | 'audit:dao';
+  | 'audit:dao'
+  // Identity Root Sync
+  | 'identity:root:changed'
+  | 'identity:root:committed';
 
 export interface Condition {
   id: string;
@@ -306,6 +309,9 @@ export interface EventPayloads {
     bits: number;
     amount: string;
     proofHash: string;
+    tokenId?: string;      // ERC-1155 tokenId (hex string)
+    contextId?: string;
+    daoAddress?: string;
   };
 
   'bohmian:evolved': {
@@ -710,6 +716,20 @@ export interface EventPayloads {
     contextSaidDrift: boolean;
     weSayDrift: boolean;
     drift: boolean;
+  };
+
+  // Identity Root Sync
+  'identity:root:changed': {
+    previousRoot: string | null;
+    newRoot: string;
+    leafCount: number;
+    changedAt: number;
+  };
+
+  'identity:root:committed': {
+    root: string;
+    txHash: string;
+    committedAt: number;
   };
 }
 
