@@ -8,7 +8,7 @@
 import { randomUUID } from 'crypto';
 import { getChain } from '../channels/chain.js';
 import { deriveAllWork, deriveWork, deriveAllNodes, type DerivedWork, type WorkStatus } from './derive.js';
-import { emitPerceived } from './variety.js';
+import { emitPerceived, emitResolved } from './variety.js';
 import type { Condition } from '../channels/events.js';
 import { resolveContextSettings, checkAutonomy } from '../../identity/node.js';
 import { getDefaultDAO, type DAOAddress } from '../../network/registry.js';
@@ -234,13 +234,21 @@ export async function completeWork(workId: string): Promise<void> {
   if (!work) throw new Error(`Work ${workId} not found`);
   if (!work.claim) throw new Error(`Work ${workId} has no claim`);
 
+  const nodeId = work.claim.nodeId;
+  const bountyAmount = work.bounty?.amount ?? 0;
+
   await getChain().append('work:completed', 'system', workId, {
-    nodeId: work.claim.nodeId,
-    bountyAmount: work.bounty?.amount ?? 0,
+    nodeId,
+    bountyAmount,
     completedAt: Date.now(),
   });
 
-  runVerificationAsync(workId, work.claim.nodeId);
+  // P0 Fix: Close the variety loop — emit resolution
+  if (bountyAmount > 0) {
+    await emitResolved(nodeId, workId, bountyAmount, workId, work.contextId);
+  }
+
+  runVerificationAsync(workId, nodeId);
 }
 
 function runVerificationAsync(workId: string, nodeId: string): void {

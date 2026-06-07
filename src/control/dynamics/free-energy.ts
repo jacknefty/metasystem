@@ -13,6 +13,7 @@ import { getChain } from '../../coordination/channels/chain.js';
 import { getWork, listWork } from '../../coordination/resources/work.js';
 import { getSystemBalance } from '../../coordination/resources/token.js';
 import { parseVerifier } from '../verify/registry.js';
+import { listContexts } from '../../identity/context.js';
 import type { Scope, FreeEnergyState, Configuration, Vector, DynamicsParameters } from './types.js';
 import { scopeKey, DEFAULT_PARAMETERS } from './types.js';
 import { getPrecision } from './precision.js';
@@ -237,8 +238,19 @@ async function computeNodeF(nodeId: string): Promise<number> {
 }
 
 async function computeDaoF(daoAddress: string): Promise<number> {
-  // DAO scope not implemented yet — requires on-chain integration
-  throw new Error(`DAO scope not implemented: ${daoAddress}. Requires network backend.`);
+  const contexts = listContexts(daoAddress);
+
+  if (contexts.length === 0) {
+    return 0;
+  }
+
+  let totalF = 0;
+  for (const context of contexts) {
+    const contextF = await computeContextF(context.frontmatter.id);
+    totalF += contextF;
+  }
+
+  return totalF / contexts.length;
 }
 
 /**

@@ -5,7 +5,7 @@
  */
 
 import { getChain } from './coordination/channels/chain.js';
-import { getWork } from './coordination/resources/work.js';
+import { getWork, postBounty } from './coordination/resources/work.js';
 import { runDynamicsControlTick } from './control/balance/homeostat.js';
 import { runVerification } from './control/verify/runner.js';
 import { executeWork, finalizeWork } from './operation/execute.js';
@@ -20,10 +20,12 @@ import { builtinProvider } from './tools/builtin/index.js';
 import { mcpProvider, connectAll as connectMCP } from './tools/mcp/index.js';
 import { loadStats as loadToolStats } from './tools/reliability.js';
 import { runToolAuditPass } from './tools/audit.js';
+import { finalizeProposal } from './coordination/governance/index.js';
 import type { ChainEvent } from './coordination/channels/events.js';
 
 let running = false;
 const expiryTimeouts = new Map<string, NodeJS.Timeout>();
+const proposalTimeouts = new Map<string, NodeJS.Timeout>();
 
 export async function initializeTools(): Promise<void> {
   registerProvider(builtinProvider);
@@ -220,6 +222,69 @@ export function startRuntime(): () => void {
     }
   });
 
+  // P0 Fix: algedonic:pain → take action based on severity
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'algedonic:pain') {
+      const payload = event.payload as {
+        severity: 1 | 2 | 3;
+        source: string;
+        message: string;
+        contextId?: string;
+      };
+
+      console.log(`[Algedonic] Pain signal: severity=${payload.severity} source=${payload.source} message=${payload.message}`);
+
+      if (payload.severity >= 2) {
+        if (payload.contextId) {
+          await getChain().append('context:attention', 'algedonic', payload.contextId, {
+            reason: payload.message,
+            source: payload.source,
+            severity: payload.severity,
+          });
+        }
+        await maybeRunHousekeeping();
+      }
+
+      if (payload.severity >= 3) {
+        console.warn(`[Algedonic] CRITICAL: ${payload.message}`);
+      }
+    }
+  });
+
+  // algedonic:acknowledged → log resumption
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'algedonic:acknowledged') {
+      console.log(`[Algedonic] Signal acknowledged: ${event.subject}`);
+    }
+  });
+
+  // P1 Fix: proposal:created → schedule finalization on deadline
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'proposal:created') {
+      const payload = event.payload as { id: string; deadline: number };
+      scheduleProposalFinalization(payload.id, payload.deadline);
+    }
+  });
+
+  // P2 Fix: work:created → auto-post bounty if amount specified
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+    if (event.type === 'work:created') {
+      const payload = event.payload as { bountyAmount?: number };
+      if (payload.bountyAmount && payload.bountyAmount > 0) {
+        try {
+          await postBounty(event.subject, payload.bountyAmount);
+          console.log(`[Runtime] Auto-posted bounty for ${event.subject}: ${payload.bountyAmount}`);
+        } catch (err) {
+          console.error('[Runtime] Failed to auto-post bounty:', err);
+        }
+      }
+    }
+  });
+
   // Rebuild locks and merge queue from chain on startup
   rebuildLocks().catch(err => {
     console.error('[Runtime] Failed to rebuild locks:', err);
@@ -243,6 +308,9 @@ export function startRuntime(): () => void {
   console.log('  - work state changes → housekeeping');
   console.log('  - work:merged → self-assessment');
   console.log('  - dynamics evolution on state changes');
+  console.log('  - algedonic:pain → severity-based action');
+  console.log('  - proposal:created → schedule finalization');
+  console.log('  - work:created → auto-post bounty');
   console.log('  - tools registered: builtin + MCP');
 
   return () => stopRuntime();
@@ -256,6 +324,11 @@ export function stopRuntime(): void {
     clearTimeout(timeout);
   }
   expiryTimeouts.clear();
+
+  for (const timeout of proposalTimeouts.values()) {
+    clearTimeout(timeout);
+  }
+  proposalTimeouts.clear();
 
   console.log('[Runtime] Stopped');
 }
@@ -287,6 +360,31 @@ function clearExpiry(workId: string): void {
     clearTimeout(timeout);
     expiryTimeouts.delete(workId);
   }
+}
+
+function scheduleProposalFinalization(proposalId: string, deadline: number): void {
+  const delay = deadline - Date.now();
+
+  if (delay <= 0) {
+    finalizeProposal(proposalId).catch(err => {
+      console.error(`[Governance] Failed to finalize ${proposalId}:`, err);
+    });
+    return;
+  }
+
+  const timeout = setTimeout(async () => {
+    proposalTimeouts.delete(proposalId);
+    try {
+      const result = await finalizeProposal(proposalId);
+      if (result) {
+        console.log(`[Governance] Finalized ${proposalId}: ${result.status}`);
+      }
+    } catch (err) {
+      console.error(`[Governance] Failed to finalize ${proposalId}:`, err);
+    }
+  }, delay);
+
+  proposalTimeouts.set(proposalId, timeout);
 }
 
 async function emitPain(source: string, subject: string, err: unknown): Promise<void> {

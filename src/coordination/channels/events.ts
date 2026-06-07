@@ -103,6 +103,7 @@ export type EventType =
   | 'tool:audited'
   // Context
   | 'context:created'
+  | 'context:attention'
   | 'identity:closed'
   // Governance
   | 'proposal:created'
@@ -585,6 +586,12 @@ export interface EventPayloads {
     purpose: string;
     parent: string;
     scope: string[];
+  };
+
+  'context:attention': {
+    reason: string;
+    source: string;
+    severity: 1 | 2 | 3;
   };
 
   'identity:closed': {

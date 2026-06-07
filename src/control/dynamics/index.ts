@@ -58,6 +58,7 @@ export {
 // Evolution
 export {
   getDynamicsState,
+  rebuildAgentState,
   evolveAgent,
   evolveAllAgents,
   getModelUncertainty,

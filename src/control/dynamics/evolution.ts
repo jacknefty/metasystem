@@ -25,12 +25,53 @@ import { buildWaveFunction } from './wave.js';
 
 const AGENT_CAPACITY = 5;
 
-// State store (would be persisted)
+// State store (rebuilt from chain on startup)
 const stateStore = new Map<string, DynamicsState>();
 
 // =============================================================================
 // State Retrieval
 // =============================================================================
+
+export async function rebuildAgentState(nodeId: string): Promise<DynamicsState | null> {
+  const events = await getChain().recall({
+    subject: nodeId,
+    type: 'dynamics:evolved',
+  });
+
+  if (events.length === 0) return null;
+
+  const latest = events[events.length - 1];
+  const payload = latest.payload as {
+    scope: Scope;
+    Q: Configuration;
+    velocity: Vector;
+    G: number;
+    quantumPotential: number;
+    mass: number;
+    τ_aggregate: number;
+    β: number;
+  };
+
+  const state: DynamicsState = {
+    nodeId,
+    scope: payload.scope,
+    Q: payload.Q,
+    velocity: payload.velocity,
+    mass: payload.mass,
+    G: payload.G,
+    gradG: ZERO_VECTOR,
+    quantumPotential: payload.quantumPotential,
+    τ_aggregate: payload.τ_aggregate,
+    β: payload.β,
+    uncertainty: 1 - payload.τ_aggregate,
+    lastEvolved: latest.timestamp,
+  };
+
+  const key = `${nodeId}:${scopeKey(payload.scope)}`;
+  stateStore.set(key, state);
+
+  return state;
+}
 
 export async function getDynamicsState(
   nodeId: string,
@@ -42,6 +83,12 @@ export async function getDynamicsState(
 
   const cached = stateStore.get(key);
   if (cached) return cached;
+
+  // Try rebuilding from chain events
+  const rebuilt = await rebuildAgentState(nodeId);
+  if (rebuilt && scopeKey(rebuilt.scope) === scopeKey(effectiveScope)) {
+    return rebuilt;
+  }
 
   // Build initial state
   const Q = await computeConfiguration(nodeId, effectiveScope);
