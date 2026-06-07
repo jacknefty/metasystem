@@ -1,16 +1,18 @@
 /**
  * Voting Power — Stake, reputation, dynamics at scope
  *
- * Same computation at every level.
+ * Eligible voters determined by membership events on chain.
+ * Contribution is credits earned within the scope's path prefix.
  */
 
 import type { Scope } from '../../control/dynamics/types.js';
+import { scopeId } from '../../control/dynamics/types.js';
+import { parent as getParentScope } from '../../identity/scoped-paths.js';
 import type { VotingPower } from './types.js';
 import { getChain } from '../channels/chain.js';
 import { getReputation } from '../resources/pool.js';
 import { getAggregatePrecision, getDynamicsState } from '../../control/dynamics/index.js';
-import { getMembers } from '../resources/membership.js';
-import { loadIdentity } from '../../identity/contract.js';
+import { loadIdentityAtScope } from '../../identity/contract.js';
 
 export async function getVotingPower(
   identity: string,
@@ -43,69 +45,71 @@ export async function getTotalContribution(scope: Scope): Promise<number> {
   return voters.reduce((sum, v) => sum + v.contribution, 0);
 }
 
+/**
+ * Get eligible voters for a scope.
+ * Strategy: find all nodes that have earned credits within this scope's path.
+ */
 async function getEligibleVoters(scope: Scope): Promise<string[]> {
-  switch (scope.level) {
-    case 'dao': {
-      const events = await getChain().recall({ type: 'credit:earned' });
-      const voters = new Set<string>();
-      for (const e of events) {
+  const scopePath = scope.root();
+
+  // Query credit events that match this scope or are within it
+  const events = await getChain().recall({ type: 'credit:earned' });
+
+  const voters = new Set<string>();
+
+  for (const e of events) {
+    const payload = e.payload as { scopePath?: string; nodeId?: string };
+
+    // Match if credit is at or within this scope
+    if (payload.scopePath?.startsWith(scopePath)) {
+      if (payload.nodeId) {
+        voters.add(payload.nodeId);
+      } else {
         voters.add(e.subject);
       }
-      return Array.from(voters);
+    } else if (!payload.scopePath) {
+      // Legacy event without scopePath — include at root scope
+      voters.add(e.subject);
     }
-    case 'context': {
-      const members = await getMembers(scope.id);
-      return members.map(m => m.nodeId);
-    }
-    case 'node': {
-      const identity = loadIdentity(scope.id);
-      if (!identity?.frontmatter.memberships) return [scope.id];
-      return identity.frontmatter.memberships
-        .filter(m => m.context)
-        .map(m => m.context);
-    }
-    case 'work': {
-      if (scope.contextId) {
-        const members = await getMembers(scope.contextId);
-        return members.map(m => m.nodeId);
-      }
-      return [];
-    }
-    default:
-      return [];
   }
+
+  // Also include membership events for this scope
+  const memberEvents = await getChain().recall({ type: 'membership:joined' });
+  for (const e of memberEvents) {
+    const payload = e.payload as { context?: string; scopePath?: string };
+    const id = scopeId(scope);
+
+    if (payload.scopePath?.startsWith(scopePath) || payload.context === id) {
+      voters.add(e.subject);
+    }
+  }
+
+  return Array.from(voters);
 }
 
+/**
+ * Get contribution (credits earned) for an identity within a scope.
+ */
 async function getContribution(identity: string, scope: Scope): Promise<number> {
   const events = await getChain().recall({ subject: identity, type: 'credit:earned' });
+  const scopePath = scope.root();
 
   const earned = events
-    .filter(e => matchesScope(e.payload as { contextId?: string; workId?: string }, scope))
+    .filter(e => {
+      const payload = e.payload as { scopePath?: string };
+      // Match if scopePath is within this scope
+      if (payload.scopePath) {
+        return payload.scopePath.startsWith(scopePath);
+      }
+      // Legacy: include all if at root, otherwise exclude
+      return scopePath === require('../../identity/scoped-paths.js').dao.root();
+    })
     .reduce((sum, e) => {
       const p = e.payload as { bits?: number };
       return sum + (p.bits ?? 0);
     }, 0);
 
   return earned;
-}
-
-function matchesScope(
-  payload: { contextId?: string; workId?: string },
-  scope: Scope
-): boolean {
-  switch (scope.level) {
-    case 'dao':
-    case 'network':
-      return true;
-    case 'context':
-      return payload.contextId === scope.id;
-    case 'work':
-      return payload.workId === scope.id;
-    case 'node':
-      return true;
-    default:
-      return true;
-  }
 }
 
 async function computeτ(identity: string, scope: Scope): Promise<number> {
@@ -116,33 +120,29 @@ async function computeτ(identity: string, scope: Scope): Promise<number> {
   return 0.5 * τ_aggregate + 0.5 * completionRate;
 }
 
+/**
+ * Get resources at a scope.
+ * Reads from identity.md if present, otherwise sums credits.
+ */
 export async function getResourcesAtScope(scope: Scope): Promise<number> {
-  switch (scope.level) {
-    case 'dao':
-    case 'network': {
-      const events = await getChain().recall({ type: 'credit:earned' });
-      return events.reduce((sum, e) => {
-        const p = e.payload as { bits?: number };
-        return sum + (p.bits ?? 0);
-      }, 0);
-    }
-    case 'context': {
-      const events = await getChain().recall({ subject: scope.id, type: 'context:created' });
-      if (events.length > 0) {
-        const p = events[0].payload as { resourcesRequested?: number };
-        return p.resourcesRequested ?? 1000;
-      }
-      return 1000;
-    }
-    case 'node': {
-      const identity = loadIdentity(scope.id);
-      if (!identity?.frontmatter.memberships) return 1.0;
-      return identity.frontmatter.memberships.reduce(
-        (sum, m) => sum + (m.capacity ?? 1.0),
-        0
-      );
-    }
-    default:
-      return 1000;
+  // Try to read from identity at this scope
+  const identity = loadIdentityAtScope(scope);
+  if (identity?.resources['Budget']) {
+    const budget = parseFloat(identity.resources['Budget']);
+    if (!isNaN(budget)) return budget;
   }
+
+  // Fall back to summing credits earned at this scope
+  const events = await getChain().recall({ type: 'credit:earned' });
+  const scopePath = scope.root();
+
+  return events
+    .filter(e => {
+      const p = e.payload as { scopePath?: string };
+      return !p.scopePath || p.scopePath.startsWith(scopePath);
+    })
+    .reduce((sum, e) => {
+      const p = e.payload as { bits?: number };
+      return sum + (p.bits ?? 0);
+    }, 0);
 }

@@ -160,7 +160,7 @@ export async function recordPrediction(
   if (params.verboseEvents) {
     await getChain().append('precision:prediction', 'dynamics', workId, {
       key: precisionKey(verifierType, scope),
-      scope,
+      scopePath: scope.root(),
       predictedOutcome,
       source,
       sourceWeight: SOURCE_WEIGHTS[source],
@@ -187,7 +187,7 @@ export async function recordObservation(
   if (params.verboseEvents) {
     await getChain().append('precision:observation', 'dynamics', predictionId, {
       key: precisionKey(prediction.verifierType, prediction.scope),
-      scope: prediction.scope,
+      scopePath: prediction.scope.root(),
       actualOutcome,
       predictionId,
       squaredError: error * error,
@@ -253,7 +253,7 @@ async function updatePrecision(
   if (Δτ > params.τChangeThreshold) {
     await getChain().append('precision:updated', 'dynamics', scopeKey(scope), {
       key,
-      scope,
+      scopePath: scope.root(),
       τ: newτ,
       samples: effectiveSamples,
       runningError: Math.abs(newτ - prior),

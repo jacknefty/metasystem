@@ -127,6 +127,7 @@ export async function emitVariety(
     context?: string;      // descriptive label ("work posted", "scan complete")
     contextId?: string;    // scope identifier for filtering
     daoAddress?: string;   // DAO scope identifier
+    scopePath?: string;    // full scope path for recursive F computation
   }
 ): Promise<VarietyToken> {
   const eventType = buildEventType(domain, direction);
@@ -137,6 +138,7 @@ export async function emitVariety(
   if (opts?.context) payload.context = opts.context;
   if (opts?.contextId) payload.contextId = opts.contextId;
   if (opts?.daoAddress) payload.daoAddress = opts.daoAddress;
+  if (opts?.scopePath) payload.scopePath = opts.scopePath;
 
   const event = await getChain().append(eventType, source, subject, payload as EventPayloads[typeof eventType]);
 
@@ -256,81 +258,6 @@ export async function getSystemBalance(): Promise<SystemBalance> {
     healthy: ratio === 1.0,
     byDomain,
   };
-}
-
-export type ScopeLevel = 'network' | 'dao' | 'context' | 'node' | 'work' | 'condition';
-
-export interface VarietyScope {
-  level: ScopeLevel;
-  id?: string;
-  address?: string;
-  contextId?: string;
-}
-
-export async function getScopedBalance(scope: VarietyScope): Promise<SystemBalance> {
-  const events = await getChain().recall({});
-
-  const domainBalances: Record<VarietyDomain, VarietyBalance> = {
-    work: { domain: 'work', in: 0, out: 0, net: 0 },
-    env: { domain: 'env', in: 0, out: 0, net: 0 },
-    coord: { domain: 'coord', in: 0, out: 0, net: 0 },
-    identity: { domain: 'identity', in: 0, out: 0, net: 0 },
-  };
-
-  for (const event of events) {
-    const parsed = parseEventType(event.type);
-    if (!parsed) continue;
-
-    const payload = event.payload as {
-      bits?: number;
-      contextId?: string;
-      daoAddress?: string;
-    };
-
-    if (!matchesScope(payload, scope)) continue;
-
-    const { domain, direction } = parsed;
-    const bits = payload.bits ?? 0;
-
-    if (direction === 'in') {
-      domainBalances[domain].in += bits;
-    } else {
-      domainBalances[domain].out += bits;
-    }
-    domainBalances[domain].net = domainBalances[domain].in - domainBalances[domain].out;
-  }
-
-  const perceived = Object.values(domainBalances).reduce((sum, d) => sum + d.in, 0);
-  const resolved = Object.values(domainBalances).reduce((sum, d) => sum + d.out, 0);
-  const ratio = resolved > 0 ? perceived / resolved : (perceived > 0 ? Infinity : 0);
-
-  return {
-    perceived,
-    resolved,
-    ratio,
-    healthy: ratio >= 0.8 && ratio <= 1.2,
-    byDomain: domainBalances,
-  };
-}
-
-function matchesScope(
-  payload: { contextId?: string; daoAddress?: string },
-  scope: VarietyScope
-): boolean {
-  switch (scope.level) {
-    case 'network':
-      return true;
-    case 'dao':
-      return payload.daoAddress === scope.address;
-    case 'context':
-      return payload.contextId === scope.id;
-    case 'node':
-    case 'work':
-    case 'condition':
-      return payload.contextId === scope.contextId;
-    default:
-      return true;
-  }
 }
 
 export function bitsToAmount(bits: number): bigint {

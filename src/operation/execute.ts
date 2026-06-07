@@ -341,16 +341,7 @@ export async function finalizeWork(
   }
 
   await completeWork(workId);
-
-  const varietyBits = work.conditions.reduce(
-    (sum, c) => sum + (c.varietyWeight ?? 10),
-    0
-  );
-
-  await emitVariety('work', 'out', 'system', workId, varietyBits, {
-    workId,
-    context: 'work completed',
-  });
+  // Note: completeWork emits variety:work:out already
 
   const resolution = await getResolution(workId);
 

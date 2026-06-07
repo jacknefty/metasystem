@@ -4,6 +4,7 @@
  * Quick sanity checks to verify implementation correctness.
  */
 
+import { dao } from '../../identity/scoped-paths.js';
 import type { Scope, Configuration, DynamicsParameters } from './types.js';
 import { DEFAULT_PARAMETERS } from './types.js';
 import { getFreeEnergy, getExpectedFreeEnergy, sampleGLandscape, interpolateG, gradientG } from './free-energy.js';
@@ -20,7 +21,7 @@ interface ValidationResult {
  * Validate F aggregation: F(parent) = Σ F(children)
  */
 export async function validateFAggregation(contextId: string): Promise<ValidationResult> {
-  const { getWork, listWork } = await import('../../coordination/resources/work.js');
+  const { listWork } = await import('../../coordination/resources/work.js');
 
   const workItems = await listWork({ contextId });
   const activeWork = workItems.filter(w => w.status !== 'fulfilled');
@@ -28,13 +29,13 @@ export async function validateFAggregation(contextId: string): Promise<Validatio
   // Sum F for each work item
   let sumWorkF = 0;
   for (const work of activeWork) {
-    const workScope: Scope = { level: 'work', id: work.id, contextId };
+    const workScope = dao.context(contextId).task(work.id);
     const workF = await getFreeEnergy(workScope);
     sumWorkF += workF;
   }
 
   // Get context F
-  const contextScope: Scope = { level: 'context', id: contextId };
+  const contextScope = dao.context(contextId);
   const contextF = await getFreeEnergy(contextScope);
 
   const passed = Math.abs(contextF - sumWorkF) < 0.01;
@@ -56,7 +57,7 @@ export async function validatePrecisionConvergence(
   resetPrecision();
 
   const testVerifier = 'test:convergence';
-  const scope: Scope = { level: 'network' };
+  const scope = dao; // Use DAO scope as network-level
   const params = { ...DEFAULT_PARAMETERS, learningThreshold: 20 };
 
   // Simulate observations with known true rate
@@ -68,7 +69,7 @@ export async function validatePrecisionConvergence(
       `cond_${i}`,
       testVerifier,
       scope,
-      currentPrecision.τ,  // predicted outcome is current τ
+      currentPrecision.τ,
       'automated',
       params
     );
@@ -80,7 +81,7 @@ export async function validatePrecisionConvergence(
 
   const precision = await getPrecision(testVerifier, scope);
   const error = Math.abs(precision.τ - trueRate);
-  const passed = error < 0.15; // Within 15% of true rate
+  const passed = error < 0.15;
 
   resetPrecision();
 
@@ -95,7 +96,7 @@ export async function validatePrecisionConvergence(
  * Validate guidance: velocity · ∇G < 0 (always moves toward lower G)
  */
 export async function validateGuidanceDownhill(
-  scope: Scope = { level: 'network' },
+  scope: Scope = dao,
   sampleCount: number = 20
 ): Promise<ValidationResult> {
   const params = DEFAULT_PARAMETERS;
@@ -125,7 +126,7 @@ export async function validateGuidanceDownhill(
     totalChecks++;
 
     // Should be ≤ 0 (moving downhill or stationary)
-    if (dotProduct > 0.001) { // Small tolerance for numerical error
+    if (dotProduct > 0.001) {
       violations++;
       if (violations <= 3) {
         details.push(`Q=(${Q.verified.toFixed(2)},${Q.active.toFixed(2)},${Q.resources.toFixed(2)}): v·∇G = ${dotProduct.toFixed(4)} > 0`);
@@ -147,7 +148,7 @@ export async function validateGuidanceDownhill(
 /**
  * Validate G = F + γH identity
  */
-export async function validateGIdentity(scope: Scope = { level: 'network' }): Promise<ValidationResult> {
+export async function validateGIdentity(scope: Scope = dao): Promise<ValidationResult> {
   const params = DEFAULT_PARAMETERS;
 
   const F = await getFreeEnergy(scope);
@@ -263,11 +264,11 @@ export async function validateChallengeWindow(): Promise<ValidationResult> {
  * Validate merkle tree integrity
  */
 export async function validateMerkleTree(): Promise<ValidationResult> {
-  const { hashCreditLeaf, getMerkleRoot, getMerkleProof, verifyMerkleProof, createCredit, resetBridge } = await import('./bridge.js');
+  const { getMerkleRoot, getMerkleProof, verifyMerkleProof, createCredit, resetBridge } = await import('./bridge.js');
 
   resetBridge();
 
-  const scope: Scope = { level: 'network' };
+  const scope = dao;
   const params = DEFAULT_PARAMETERS;
 
   // Create test work proof
@@ -376,9 +377,6 @@ export async function validateFNetworkAggregation(): Promise<ValidationResult> {
 
 /**
  * Validate τ inheritance through scope chain
- *
- * When a scope has fewer samples than learningThreshold, it should
- * fall back to or blend with the parent scope's precision.
  */
 export async function validatePrecisionInheritance(): Promise<ValidationResult> {
   const { getPrecision, recordPrediction, recordObservation, resetPrecision } = await import('./precision.js');
@@ -389,7 +387,7 @@ export async function validatePrecisionInheritance(): Promise<ValidationResult> 
   const params = { ...DEFAULT_PARAMETERS, learningThreshold: 10 };
 
   // Record at DAO level (parent)
-  const daoScope: Scope = { level: 'dao', address: 'local:metasystem' };
+  const daoScope = dao;
 
   // Build up DAO-level precision with many observations
   for (let i = 0; i < 20; i++) {
@@ -400,17 +398,11 @@ export async function validatePrecisionInheritance(): Promise<ValidationResult> 
   const daoPrecision = await getPrecision(testVerifier, daoScope, params);
 
   // Now query at work level (child) with NO local samples
-  const workScope: Scope = {
-    level: 'work',
-    id: 'new_work',
-    contextId: 'new_context',
-    daoAddress: 'local:metasystem',
-  };
+  const workScope = dao.context('new_context').task('new_work');
 
   const workPrecision = await getPrecision(testVerifier, workScope, params);
 
   // Work level should inherit τ from DAO since it has no local samples
-  // The returned record may be the parent's, so τ values should match
   const τMatch = Math.abs(workPrecision.τ - daoPrecision.τ) < 0.01;
 
   resetPrecision();
@@ -448,8 +440,6 @@ export async function runAllValidations(contextId?: string): Promise<ValidationR
   // Network State (Phase 4)
   results.push(await validateFNetworkAggregation());
   results.push(await validatePrecisionInheritance());
-  // Skip mint rate scaling validation since it duplicates Phase 5 test
-  // results.push(await validateMintRateScaling());
 
   // F aggregation (needs a context with work)
   if (contextId) {

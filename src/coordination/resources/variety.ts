@@ -15,6 +15,7 @@ export interface VarietyOptions {
   contextId?: string;    // scope identifier for filtering
   daoAddress?: string;   // DAO scope identifier
   workId?: string;       // for resolved variety
+  scopePath?: string;    // full scope path for recursive F computation
 }
 
 export async function emitPerceived(
@@ -27,6 +28,7 @@ export async function emitPerceived(
     context: opts?.context,
     contextId: opts?.contextId,
     daoAddress: opts?.daoAddress,
+    scopePath: opts?.scopePath,
   });
 }
 
@@ -41,6 +43,7 @@ export async function emitResolved(
     context: opts?.context,
     contextId: opts?.contextId,
     daoAddress: opts?.daoAddress,
+    scopePath: opts?.scopePath,
   });
 }
 

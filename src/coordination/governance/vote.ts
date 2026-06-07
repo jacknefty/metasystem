@@ -7,10 +7,13 @@
  */
 
 import type { Scope } from '../../control/dynamics/types.js';
+import { scopeId } from '../../control/dynamics/types.js';
+import { isWithin } from '../../identity/scoped-paths.js';
 import type { Proposal, Vote, VotingPower } from './types.js';
 import { getChain } from '../channels/chain.js';
 import { getVotingPower, getTotalContribution } from './power.js';
 import { getReputation } from '../resources/pool.js';
+import { loadIdentity } from '../../identity/contract.js';
 
 const γ = 0.3;
 
@@ -79,27 +82,89 @@ async function estimateFreeEnergyReduction(
   return cost - benefit;
 }
 
+/**
+ * Compute relevance of a proposal to a voter.
+ * Scale-free: based on variety intersection, not path sniffing or depth.
+ *
+ * relevance = overlap(voter_scopes, proposal_scope) / total_voter_scopes
+ */
 function computeRelevance(proposal: Proposal, voterId: string): number {
-  const scope = proposal.scope;
+  const proposalPath = proposal.scope.root();
+  const id = scopeId(proposal.scope);
 
-  if (scope.level === 'node' && 'id' in scope && scope.id === voterId) {
+  // Self-relevance: proposal directly about this voter's identity
+  if (id === voterId) {
     return 1.0;
   }
 
-  if (scope.level === 'context') {
-    return 0.7;
+  // Check membership overlap
+  const identity = loadIdentity(voterId);
+  if (!identity?.frontmatter.memberships?.length) {
+    // No memberships = minimal relevance (outsider)
+    return 0.1;
   }
 
-  if (scope.level === 'dao') {
-    return 0.3;
+  const memberships = identity.frontmatter.memberships;
+  let overlapCount = 0;
+
+  for (const membership of memberships) {
+    // Direct membership in proposal scope
+    if (membership.context === id) {
+      overlapCount += 1;
+      continue;
+    }
+
+    // Voter's membership scope contains or is contained by proposal scope
+    const memberPath = `/contexts/${membership.context}`;
+    if (isWithin(proposalPath, proposal.scope) || proposalPath.startsWith(memberPath) || memberPath.startsWith(proposalPath)) {
+      overlapCount += 0.5; // Partial overlap
+    }
   }
 
-  return 0.5;
+  // Relevance = overlap ratio, clamped to [0.1, 1.0]
+  const relevance = overlapCount / memberships.length;
+  return Math.max(0.1, Math.min(1.0, relevance));
 }
 
+/**
+ * Estimate uncertainty about a proposal's outcome.
+ * Scale-free: derived from historical success rate at this scope, not type constants.
+ *
+ * H = novelty × (1 - proposer_track_record)
+ * novelty = 1 - (successful_proposals_at_scope / total_proposals_at_scope)
+ */
 async function estimateUncertainty(proposal: Proposal): Promise<number> {
-  const novelty = proposal.type === 'context' ? 0.8 : proposal.type === 'work' ? 0.5 : 0.3;
+  // Get historical proposals at this scope to compute novelty
+  const scopePath = proposal.scope.root();
+  const allProposals = await getChain().recall({ type: 'proposal:created' });
+  const executedProposals = await getChain().recall({ type: 'proposal:executed' });
 
+  // Filter proposals at or within this scope
+  const scopeProposals = allProposals.filter(e => {
+    const p = e.payload as { scope?: Scope };
+    return p.scope?.root()?.startsWith(scopePath);
+  });
+
+  const successfulIds = new Set(
+    executedProposals
+      .filter(e => {
+        const p = e.payload as { success?: boolean };
+        return p.success === true;
+      })
+      .map(e => e.subject)
+  );
+
+  const successful = scopeProposals.filter(e => {
+    const p = e.payload as { id?: string };
+    return p.id && successfulIds.has(p.id);
+  }).length;
+
+  const total = scopeProposals.length || 1;
+
+  // Novelty: less history = more uncertain
+  const novelty = 1 - (successful / total);
+
+  // Proposer track record
   const reputation = await getReputation(proposal.proposer);
   const trackRecord = reputation.completionRate;
 

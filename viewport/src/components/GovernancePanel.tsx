@@ -223,11 +223,9 @@ export function GovernancePanel({ nodeId }: GovernancePanelProps) {
         <ConstantRow label="Default quorum" value={formatPercent(constants.governance.defaultQuorum)} />
       </Section>
 
-      {/* Voting Periods */}
-      <Section title="Voting Periods">
-        {Object.entries(constants.governance.votingPeriods).map(([level, ms]) => (
-          <ConstantRow key={level} label={level} value={formatDuration(ms)} />
-        ))}
+      {/* Voting Period */}
+      <Section title="Voting Period">
+        <ConstantRow label="Default" value={formatDuration(constants.governance.defaultVotingPeriod)} hint="inherited from identity.md" />
       </Section>
 
       {/* Dynamics Parameters */}

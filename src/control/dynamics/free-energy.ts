@@ -1,22 +1,69 @@
 /**
- * Free Energy Computation
+ * Free Energy Computation — Recursive Path-Based
  *
  * F(S) = Σ variety:in(S) - Σ variety:out(S)
  * H(S) = Σ (1 - confidence(τ)) × weight   (epistemic uncertainty)
  * G(S) = F(S) + γ × H(S)                  (expected free energy)
  *
- * Scale-free: works at condition, work, context, node, dao, network levels.
- * Aggregates upward through scope hierarchy.
+ * Scale-free: single recursive function works at any depth.
+ * Aggregates upward through scope hierarchy via chain queries.
  */
 
 import { getChain } from '../../coordination/channels/chain.js';
-import { getWork, listWork } from '../../coordination/resources/work.js';
-import { getSystemBalance } from '../../coordination/resources/token.js';
-import { parseVerifier } from '../verify/registry.js';
-import { listContexts } from '../../identity/context.js';
+import { at, depth as scopeDepth } from '../../identity/scoped-paths.js';
 import type { Scope, FreeEnergyState, Configuration, Vector, DynamicsParameters } from './types.js';
 import { scopeKey, getParentScope, DEFAULT_PARAMETERS } from './types.js';
-import { getPrecision } from './precision.js';
+
+/**
+ * Query child scopes from chain events.
+ * Children are contexts, stories, tasks, or nodes created under this scope.
+ */
+export async function listChildScopes(scope: Scope): Promise<Scope[]> {
+  const scopePath = scope.root();
+
+  // Query creation events
+  const events = await getChain().recall({
+    type: ['context:created', 'work:created', 'identity:created'],
+  });
+
+  const children: Scope[] = [];
+
+  for (const event of events) {
+    const payload = event.payload as {
+      scopePath?: string;
+      parentPath?: string;
+      contextPath?: string;
+      contextId?: string;
+    };
+
+    // Match events that are direct children of this scope
+    const eventPath = payload.scopePath || payload.contextPath;
+    const parentPath = payload.parentPath;
+
+    if (parentPath === scopePath) {
+      // Explicit parent reference
+      if (eventPath) {
+        children.push(at(eventPath));
+      }
+    } else if (eventPath && isDirectChild(scopePath, eventPath)) {
+      // Infer from path structure
+      children.push(at(eventPath));
+    }
+  }
+
+  return children;
+}
+
+/**
+ * Check if childPath is a direct child of parentPath (one level down)
+ */
+function isDirectChild(parentPath: string, childPath: string): boolean {
+  if (!childPath.startsWith(parentPath)) return false;
+  const remainder = childPath.slice(parentPath.length).replace(/^\//, '');
+  // Direct child has exactly 2 segments: type/id (e.g., "contexts/auth")
+  const segments = remainder.split('/').filter(Boolean);
+  return segments.length === 2;
+}
 
 // Cache for computed F values (short TTL)
 const fCache = new Map<string, { F: number; computedAt: number }>();
@@ -79,229 +126,138 @@ export async function getEpistemicValue(
   return computeEpistemicValue(scope, params);
 }
 
+/**
+ * Recursive epistemic value computation.
+ * H = local uncertainty + sum of children's H
+ */
 async function computeEpistemicValue(
   scope: Scope,
   params: DynamicsParameters
 ): Promise<number> {
-  switch (scope.level) {
-    case 'condition':
-      return computeConditionH(scope.id, scope.workId, scope, params);
-    case 'work':
-      return computeWorkH(scope.id, scope, params);
-    case 'context':
-      return computeContextH(scope.id, scope, params);
-    case 'node':
-    case 'dao':
-    case 'network':
-      return computeAggregateH(scope, params);
+  // Local H from unresolved variety at this scope
+  const localH = await computeLocalH(scope, params);
+
+  // Children's H
+  const children = await listChildScopes(scope);
+  let childrenH = 0;
+  for (const child of children) {
+    childrenH += await computeEpistemicValue(child, params);
   }
+
+  return localH + childrenH;
 }
 
-async function computeConditionH(
-  conditionId: string,
-  workId: string,
-  scope: Scope,
-  params: DynamicsParameters
-): Promise<number> {
-  const work = await getWork(workId);
-  if (!work) return 0;
-
-  const condition = work.conditions.find(c => c.id === conditionId);
-  if (!condition) return 0;
-  if (condition.met) return 0; // No uncertainty about resolved conditions
-
-  const { type: verifierType } = parseVerifier(condition.verifier);
-  const precision = await getPrecision(verifierType, scope);
-  const confidence = Math.min(precision.samples / params.learningThreshold, 1);
-  const weight = condition.varietyWeight ?? 10;
-
-  return (1 - confidence) * weight;
-}
-
-async function computeWorkH(
-  workId: string,
-  scope: Scope,
-  params: DynamicsParameters
-): Promise<number> {
-  const work = await getWork(workId);
-  if (!work) return 0;
+/**
+ * Local epistemic uncertainty at a single scope (no children).
+ * Based on unresolved variety events and their confidence.
+ */
+async function computeLocalH(scope: Scope, params: DynamicsParameters): Promise<number> {
+  const scopePath = scope.root();
+  const events = await getChain().recall({ type: 'variety:work:in' });
 
   let H = 0;
-  for (const condition of work.conditions) {
-    if (condition.met) continue;
-    H += await computeConditionH(condition.id, workId, scope, params);
+  for (const event of events) {
+    const payload = event.payload as { bits?: number; scopePath?: string; workId?: string };
+
+    // Match events at this scope
+    if (payload.scopePath?.startsWith(scopePath) || event.subject === scopePath) {
+      const bits = payload.bits ?? 10;
+      // Check if resolved
+      const resolved = await isVarietyResolved(event.subject, scopePath);
+      if (!resolved) {
+        // Uncertainty weight — could be enhanced with precision lookup
+        const confidence = 0.5; // Default confidence
+        H += (1 - confidence) * bits;
+      }
+    }
   }
+
   return H;
 }
 
-async function computeContextH(
-  contextId: string,
-  scope: Scope,
-  params: DynamicsParameters
-): Promise<number> {
-  const workItems = await listWork({ contextId });
-
-  let H = 0;
-  for (const work of workItems) {
-    if (work.status === 'fulfilled') continue;
-    const workScope: Scope = { level: 'work', id: work.id, contextId };
-    H += await computeWorkH(work.id, workScope, params);
-  }
-  return H;
+async function isVarietyResolved(subject: string, scopePath: string): Promise<boolean> {
+  const outEvents = await getChain().recall({ type: 'variety:work:out', subject });
+  return outEvents.length > 0;
 }
 
-async function computeAggregateH(
-  scope: Scope,
-  params: DynamicsParameters
-): Promise<number> {
-  // For node/dao/network, aggregate H from all active work
-  const workItems = await listWork({});
-
-  let H = 0;
-  for (const work of workItems) {
-    if (work.status === 'fulfilled') continue;
-    const workScope: Scope = { level: 'work', id: work.id, contextId: work.contextId };
-    H += await computeWorkH(work.id, workScope, params);
-  }
-  return H;
-}
-
+/**
+ * Recursive free energy computation.
+ * F = local F + sum of children's F
+ */
 async function computeFreeEnergy(scope: Scope): Promise<number> {
-  switch (scope.level) {
-    case 'condition':
-      return computeConditionF(scope.id, scope.workId);
-    case 'work':
-      return computeWorkF(scope.id, scope.contextId);
-    case 'context':
-      return computeContextF(scope.id);
-    case 'node':
-      return computeNodeF(scope.id);
-    case 'dao':
-      return computeDaoF(scope.address);
-    case 'network':
-      return computeNetworkF();
+  const localF = await computeLocalF(scope);
+
+  const children = await listChildScopes(scope);
+  let childrenF = 0;
+  for (const child of children) {
+    childrenF += await computeFreeEnergy(child);
   }
+
+  return localF + childrenF;
 }
 
-async function computeConditionF(conditionId: string, workId: string): Promise<number> {
-  const work = await getWork(workId);
-  if (!work) return 0;
-
-  const condition = work.conditions.find(c => c.id === conditionId);
-  if (!condition) return 0;
-
-  const weight = condition.varietyWeight ?? 10;
-  return condition.met ? 0 : weight;
+/**
+ * Local free energy at a single scope (no children).
+ * F_local = perceived - resolved from variety events at this path.
+ */
+async function computeLocalF(scope: Scope): Promise<number> {
+  const { perceived, resolved } = await getLocalVarietyBalance(scope);
+  return perceived - resolved;
 }
 
-async function computeWorkF(workId: string, contextId: string): Promise<number> {
-  const work = await getWork(workId);
-  if (!work) return 0;
+/**
+ * Get variety balance at a scope (perceived vs resolved).
+ * Includes local + children.
+ */
+async function getVarietyBalance(scope: Scope): Promise<{ perceived: number; resolved: number }> {
+  const local = await getLocalVarietyBalance(scope);
 
-  let F = 0;
-  for (const condition of work.conditions) {
-    F += await computeConditionF(condition.id, workId);
+  const children = await listChildScopes(scope);
+  let childPerceived = 0;
+  let childResolved = 0;
+
+  for (const child of children) {
+    const childBalance = await getVarietyBalance(child);
+    childPerceived += childBalance.perceived;
+    childResolved += childBalance.resolved;
   }
-  return F;
+
+  return {
+    perceived: local.perceived + childPerceived,
+    resolved: local.resolved + childResolved,
+  };
 }
 
-async function computeContextF(contextId: string): Promise<number> {
-  const workItems = await listWork({ contextId });
+/**
+ * Local variety balance at a single scope.
+ * Queries chain events by scopePath prefix.
+ */
+async function getLocalVarietyBalance(scope: Scope): Promise<{ perceived: number; resolved: number }> {
+  const scopePath = scope.root();
 
-  let F = 0;
-  for (const work of workItems) {
-    if (work.status === 'fulfilled') continue;
-    F += await computeWorkF(work.id, contextId);
-  }
-  return F;
-}
-
-async function computeNodeF(nodeId: string): Promise<number> {
-  // Node F = sum of F for all contexts the node is responsible for
-  // For now, use system balance scoped to node
-  const events = await getChain().recall({ subject: nodeId });
+  // Get all variety events
+  const inEvents = await getChain().recall({ type: ['variety:work:in', 'variety:env:in'] });
+  const outEvents = await getChain().recall({ type: ['variety:work:out', 'variety:env:out'] });
 
   let perceived = 0;
   let resolved = 0;
 
-  for (const event of events) {
-    if (event.type.startsWith('variety:') && event.type.includes(':in')) {
-      const payload = event.payload as { bits: number };
-      perceived += payload.bits;
-    } else if (event.type.startsWith('variety:') && event.type.includes(':out')) {
-      const payload = event.payload as { bits: number };
-      resolved += payload.bits;
+  for (const event of inEvents) {
+    const payload = event.payload as { bits?: number; scopePath?: string };
+    // Match if scopePath matches exactly (not prefix — that's for children)
+    if (payload.scopePath === scopePath) {
+      perceived += payload.bits ?? 0;
     }
   }
 
-  return perceived - resolved;
-}
-
-async function computeDaoF(daoAddress: string): Promise<number> {
-  const contexts = listContexts(daoAddress);
-
-  if (contexts.length === 0) {
-    return 0;
-  }
-
-  let totalF = 0;
-  for (const context of contexts) {
-    const contextF = await computeContextF(context.frontmatter.id);
-    totalF += contextF;
-  }
-
-  return totalF; // Sum, not average — variety adds
-}
-
-/**
- * Stub: List all DAOs in the network
- * Returns empty until network integration is complete
- */
-export async function listDAOs(): Promise<Array<{ address: string }>> {
-  return [];
-}
-
-async function computeNetworkF(): Promise<number> {
-  const balance = await getSystemBalance();
-  return balance.perceived - balance.resolved;
-}
-
-async function getVarietyBalance(scope: Scope): Promise<{ perceived: number; resolved: number }> {
-  switch (scope.level) {
-    case 'condition': {
-      const work = await getWork(scope.workId);
-      const condition = work?.conditions.find(c => c.id === scope.id);
-      if (!condition) return { perceived: 0, resolved: 0 };
-      const weight = condition.varietyWeight ?? 10;
-      return condition.met
-        ? { perceived: weight, resolved: weight }
-        : { perceived: weight, resolved: 0 };
-    }
-    case 'work': {
-      const work = await getWork(scope.id);
-      if (!work) return { perceived: 0, resolved: 0 };
-      let perceived = 0;
-      let resolved = 0;
-      for (const c of work.conditions) {
-        const weight = c.varietyWeight ?? 10;
-        perceived += weight;
-        if (c.met) resolved += weight;
-      }
-      return { perceived, resolved };
-    }
-    case 'network': {
-      const balance = await getSystemBalance();
-      return { perceived: balance.perceived, resolved: balance.resolved };
-    }
-    default: {
-      // For context, node, dao — aggregate from children
-      const F = await computeFreeEnergy(scope);
-      // Approximate: assume half is perceived, other half is F
-      const resolved = Math.max(0, -F);
-      const perceived = resolved + F;
-      return { perceived, resolved };
+  for (const event of outEvents) {
+    const payload = event.payload as { bits?: number; scopePath?: string };
+    if (payload.scopePath === scopePath) {
+      resolved += payload.bits ?? 0;
     }
   }
+
+  return { perceived, resolved };
 }
 
 // =============================================================================
@@ -314,7 +270,6 @@ export async function gradientG(
   params: DynamicsParameters = DEFAULT_PARAMETERS,
   epsilon: number = 0.1
 ): Promise<Vector> {
-  // Sample G landscape and compute numerical gradient
   const landscape = await sampleGLandscape(scope, 5, params);
   return gradientFromLandscape(landscape, Q, epsilon);
 }
@@ -365,10 +320,6 @@ export async function sampleGLandscape(
   const state = await getFreeEnergyState(scope, params);
   const baseG = state.G;
 
-  // G(Q) models how expected free energy varies with agent configuration
-  // G decreases as verified increases (more resolved = lower F)
-  // G increases with active (more WIP = higher uncertainty = higher H)
-
   for (let v = 0; v <= 1; v += 1 / resolution) {
     for (let a = 0; a <= 1; a += 1 / resolution) {
       for (let r = 0; r <= 1; r += 1 / resolution) {
@@ -393,7 +344,7 @@ export function interpolateG(
   return landscape.get(key) ?? 0;
 }
 
-// Legacy aliases for backwards compatibility
+// Legacy aliases
 export const sampleFreeEnergyLandscape = sampleGLandscape;
 export const interpolateFreeEnergy = interpolateG;
 export const gradientFreeEnergy = gradientG;
@@ -411,28 +362,20 @@ export function invalidateFreeEnergy(scope: Scope): void {
 }
 
 // =============================================================================
-// Aggregated Free Energy (Fix 2: F Propagation)
+// Aggregated Free Energy (decomposed view)
 // =============================================================================
 
-/**
- * Decomposed free energy state showing local vs children contribution.
- * New interface — does not replace existing FreeEnergyState.
- */
 export interface FreeEnergyAggregateState {
   scope: Scope;
-  F_local: number;      // This scope's own variety (perceived - resolved)
-  F_children: number;   // Sum of children's F_total
-  F_total: number;      // F_local + F_children
+  F_local: number;
+  F_children: number;
+  F_total: number;
   childCount: number;
   computedAt: number;
 }
 
 const aggregateCache = new Map<string, { state: FreeEnergyAggregateState; computedAt: number }>();
 
-/**
- * Get decomposed free energy with local/children/total breakdown.
- * New function for Fix 2 — existing getFreeEnergy/getFreeEnergyState unchanged.
- */
 export async function getFreeEnergyAggregate(scope: Scope): Promise<FreeEnergyAggregateState> {
   const key = scopeKey(scope);
   const cached = aggregateCache.get(key);
@@ -448,13 +391,10 @@ export async function getFreeEnergyAggregate(scope: Scope): Promise<FreeEnergyAg
 }
 
 async function computeAggregateState(scope: Scope): Promise<FreeEnergyAggregateState> {
-  // Get local F from scoped variety balance
   const F_local = await computeLocalF(scope);
+  const children = await listChildScopes(scope);
 
-  // Get children's F (sum, not average)
-  const children = await getChildScopes(scope);
   let F_children = 0;
-
   for (const child of children) {
     const childState = await getFreeEnergyAggregate(child);
     F_children += childState.F_total;
@@ -470,95 +410,26 @@ async function computeAggregateState(scope: Scope): Promise<FreeEnergyAggregateS
   };
 }
 
-async function computeLocalF(scope: Scope): Promise<number> {
-  // Import here to avoid circular dependency
-  const { getScopedBalance } = await import('../../coordination/resources/token.js');
-
-  switch (scope.level) {
-    case 'condition':
-      return computeConditionF(scope.id, scope.workId);
-    case 'work':
-      // Work's local F = 0, all F comes from conditions (children)
-      return 0;
-    case 'context': {
-      const balance = await getScopedBalance({
-        level: 'context',
-        id: scope.id,
-        address: scope.daoAddress,
-      });
-      return balance.perceived - balance.resolved;
-    }
-    case 'dao': {
-      const balance = await getScopedBalance({
-        level: 'dao',
-        address: scope.address,
-      });
-      return balance.perceived - balance.resolved;
-    }
-    case 'node':
-    case 'network': {
-      const balance = await getScopedBalance({ level: scope.level });
-      return balance.perceived - balance.resolved;
-    }
-  }
-}
-
-async function getChildScopes(scope: Scope): Promise<Scope[]> {
-  switch (scope.level) {
-    case 'network': {
-      // Children are all DAOs
-      const events = await getChain().recall({ type: 'dao:registered' });
-      return events.map(e => ({ level: 'dao', address: e.subject } as Scope));
-    }
-    case 'dao': {
-      // Children are contexts in this DAO
-      const contexts = listContexts(scope.address);
-      return contexts.map(c => ({
-        level: 'context',
-        id: c.frontmatter.id,
-        daoAddress: scope.address,
-      } as Scope));
-    }
-    case 'context': {
-      // Children are work items in this context
-      const workItems = await listWork({ contextId: scope.id });
-      return workItems
-        .filter(w => w.status !== 'fulfilled')
-        .map(w => ({
-          level: 'work',
-          id: w.id,
-          contextId: scope.id,
-          daoAddress: scope.daoAddress,
-        } as Scope));
-    }
-    case 'work': {
-      // Children are conditions
-      const work = await getWork(scope.id);
-      if (!work) return [];
-      return work.conditions.map(c => ({
-        level: 'condition',
-        id: c.id,
-        workId: scope.id,
-        contextId: scope.contextId,
-        daoAddress: scope.daoAddress,
-      } as Scope));
-    }
-    case 'node':
-    case 'condition':
-      // Leaf nodes have no children
-      return [];
-  }
-}
-
 export function clearAggregateCache(): void {
   aggregateCache.clear();
 }
 
 export function invalidateAggregateCache(scope: Scope): void {
-  // Invalidate this scope and all ancestors
   let current: Scope | null = scope;
   while (current) {
     aggregateCache.delete(scopeKey(current));
     current = getParentScope(current);
   }
 }
+
+// =============================================================================
+// Utilities
+// =============================================================================
+
+export function scopeId(scope: Scope): string {
+  const root = scope.root();
+  const parts = root.split('/').filter(Boolean);
+  return parts[parts.length - 1] || 'dao';
+}
+
+export { scopeDepth };

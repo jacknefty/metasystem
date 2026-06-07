@@ -37,8 +37,9 @@ import { getBohmianState, getS4Field } from './intelligence/model/bohmian/index.
 import { perceiveEnvironment } from './intelligence/perceive/scan.js';
 import * as tools from './tools/index.js';
 import { checkToolHealth } from './tools/reliability.js';
-import { DEFAULT_PARAMETERS } from './control/dynamics/types.js';
-import { DEFAULT_QUORUM, DEFAULT_VOTING_PERIODS } from './coordination/governance/types.js';
+import { DEFAULT_PARAMETERS, type Scope } from './control/dynamics/types.js';
+import { DEFAULT_QUORUM, DEFAULT_VOTING_PERIOD } from './coordination/governance/types.js';
+import { dao, at } from './identity/scoped-paths.js';
 
 const app = express();
 app.use(cors());
@@ -47,6 +48,61 @@ app.use(express.json());
 function str(v: unknown): string {
   if (Array.isArray(v)) return String(v[0] ?? '');
   return String(v ?? '');
+}
+
+// Serialize Scope for JSON response — ScopedPaths methods don't survive JSON.stringify
+function serializeScope(scope: Scope): { level: string; id?: string; path: string } {
+  const path = scope.root();
+  const parts = path.split('/').filter(Boolean);
+
+  // Determine level and id from path structure
+  if (path.includes('/nodes/')) {
+    const idx = parts.indexOf('nodes');
+    return { level: 'node', id: parts[idx + 1], path };
+  }
+  if (path.includes('/tasks/')) {
+    const idx = parts.indexOf('tasks');
+    return { level: 'task', id: parts[idx + 1], path };
+  }
+  if (path.includes('/stories/')) {
+    const idx = parts.indexOf('stories');
+    return { level: 'story', id: parts[idx + 1], path };
+  }
+  if (path.includes('/contexts/')) {
+    const idx = parts.indexOf('contexts');
+    return { level: 'context', id: parts[idx + 1], path };
+  }
+
+  return { level: 'dao', path };
+}
+
+function parseScope(query: { level?: unknown; id?: unknown; address?: unknown; contextId?: unknown; scopePath?: unknown }): Scope {
+  // New format: scopePath
+  if (query.scopePath) {
+    return at(str(query.scopePath));
+  }
+
+  // Legacy format: level-based
+  const level = str(query.level);
+  const id = str(query.id);
+  const address = str(query.address);
+  const contextId = str(query.contextId);
+
+  switch (level) {
+    case 'dao':
+      return dao;
+    case 'context':
+      return dao.context(id);
+    case 'work':
+    case 'task':
+      return dao.context(contextId).task(id);
+    case 'story':
+      return dao.context(contextId).story(id);
+    case 'node':
+      return dao.node(id);
+    default:
+      return dao;
+  }
 }
 
 type AsyncHandler = (req: Request, res: Response) => Promise<void>;
@@ -960,49 +1016,31 @@ app.get('/api/bohmian/field', wrap(async (req, res) => {
 import * as dynamics from './control/dynamics/index.js';
 
 app.get('/api/dynamics/state/:nodeId', wrap(async (req, res) => {
-  const scope = req.query.scope ? JSON.parse(String(req.query.scope)) : undefined;
+  const scope = req.query.scopePath ? parseScope(req.query as Record<string, unknown>) : undefined;
   res.json(await dynamics.getDynamicsState(str(req.params.nodeId), scope));
 }));
 
 app.get('/api/dynamics/free-energy', wrap(async (req, res) => {
-  const scope = req.query.scope ? JSON.parse(String(req.query.scope)) : { level: 'network' };
+  const scope = parseScope(req.query as Record<string, unknown>);
   const state = await dynamics.getFreeEnergyState(scope);
   res.json(state);
 }));
 
 // Fix 2: Aggregated F with local/children/total breakdown
 app.get('/api/dynamics/free-energy/aggregate', wrap(async (req, res) => {
-  const { level, id, address } = req.query;
-
-  let scope: dynamics.Scope;
-  switch (level) {
-    case 'network':
-      scope = { level: 'network' };
-      break;
-    case 'dao':
-      scope = { level: 'dao', address: str(address) };
-      break;
-    case 'context':
-      scope = { level: 'context', id: str(id) };
-      break;
-    case 'work':
-      scope = { level: 'work', id: str(id), contextId: str(req.query.contextId) };
-      break;
-    default:
-      scope = { level: 'network' };
-  }
-
+  const scope = parseScope(req.query as Record<string, unknown>);
   const state = await dynamics.getFreeEnergyAggregate(scope);
-  res.json(state);
+  // Serialize scope for JSON response
+  res.json({ ...state, scope: serializeScope(state.scope) });
 }));
 
 app.get('/api/dynamics/field', wrap(async (req, res) => {
-  const scope = req.query.scope ? JSON.parse(String(req.query.scope)) : { level: 'network' };
+  const scope = parseScope(req.query as Record<string, unknown>);
   res.json(await dynamics.buildS4Field(scope));
 }));
 
 app.get('/api/dynamics/precision', wrap(async (req, res) => {
-  const scope = req.query.scope ? JSON.parse(String(req.query.scope)) : { level: 'network' };
+  const scope = parseScope(req.query as Record<string, unknown>);
   const verifierType = req.query.verifier ? String(req.query.verifier) : undefined;
 
   if (verifierType) {
@@ -1024,7 +1062,7 @@ app.post('/api/dynamics/evolve/:nodeId', wrap(async (req, res) => {
 
 app.post('/api/dynamics/tick', wrap(async (req, res) => {
   const nodeId = req.body.nodeId;
-  const scope = req.body.scope ?? { level: 'node', id: nodeId };
+  const scope = req.body.scopePath ? at(req.body.scopePath) : dao.node(nodeId);
   const dt = req.body.dt ?? 1.0;
   const result = await dynamics.runDynamicsTick(nodeId, scope, dt);
   res.json(result);
@@ -1035,12 +1073,12 @@ app.post('/api/dynamics/homeostat', wrap(async (req, res) => {
 }));
 
 app.get('/api/dynamics/opportunities', wrap(async (req, res) => {
-  const scope = req.query.scope ? JSON.parse(String(req.query.scope)) : { level: 'network' };
+  const scope = parseScope(req.query as Record<string, unknown>);
   res.json(await dynamics.getBestOpportunity(scope));
 }));
 
 app.get('/api/dynamics/threats', wrap(async (req, res) => {
-  const scope = req.query.scope ? JSON.parse(String(req.query.scope)) : { level: 'network' };
+  const scope = parseScope(req.query as Record<string, unknown>);
   res.json(await dynamics.getActiveThreats(scope));
 }));
 
@@ -1197,15 +1235,16 @@ app.delete('/api/dao/:address', wrap(async (req, res) => {
 }));
 
 app.get('/api/dao/:address/F', wrap(async (req, res) => {
-  const dao = daoRegistry.getDAO(str(req.params.address) as daoRegistry.DAOAddress);
-  if (!dao) {
+  const daoEntry = daoRegistry.getDAO(str(req.params.address) as daoRegistry.DAOAddress);
+  if (!daoEntry) {
     res.status(404).json({ error: 'DAO not found' });
     return;
   }
-  const scope = { level: 'dao' as const, address: dao.address };
+  // Use root dao scope for local DAO
+  const scope = dao;
   try {
     const state = await dynamics.getFreeEnergyState(scope);
-    res.json({ address: dao.address, ...state });
+    res.json({ address: daoEntry.address, ...state });
   } catch {
     // DAO scope not fully implemented yet - compute from contexts
     const allWork = await work.listWork({});
@@ -1216,7 +1255,7 @@ app.get('/api/dao/:address/F', wrap(async (req, res) => {
     const F = daoWork
       .filter(w => w.status !== 'fulfilled')
       .reduce((sum, w) => sum + w.conditions.filter(c => !c.met).reduce((s, c) => s + (c.varietyWeight ?? 10), 0), 0);
-    res.json({ address: dao.address, F, workCount: daoWork.length });
+    res.json({ address: daoEntry.address, F, workCount: daoWork.length });
   }
 }));
 
@@ -1320,8 +1359,7 @@ app.get('/api/network/history', wrap(async (req, res) => {
 }));
 
 app.get('/api/network/precision/:verifier', wrap(async (req, res) => {
-  const scope = { level: 'network' as const };
-  const precision = await dynamics.getPrecision(str(req.params.verifier), scope);
+  const precision = await dynamics.getPrecision(str(req.params.verifier), dao);
   res.json(precision);
 }));
 
@@ -1389,7 +1427,7 @@ app.get('/api/system/constants', wrap(async (req, res) => {
     dynamics: DEFAULT_PARAMETERS,
     governance: {
       defaultQuorum: DEFAULT_QUORUM,
-      votingPeriods: DEFAULT_VOTING_PERIODS,
+      defaultVotingPeriod: DEFAULT_VOTING_PERIOD,
       thresholdFormula: {
         baseThreshold: 0.5,
         scaleFactor: 0.3,
@@ -1925,11 +1963,13 @@ app.get('/api/proposals', wrap(async (req, res) => {
   if (req.query.type) filter.type = str(req.query.type) as governance.ProposalType;
   if (req.query.proposer) filter.proposer = str(req.query.proposer);
   const proposals = await governance.listProposals(filter);
-  res.json(proposals);
+  // Serialize scope for JSON response
+  res.json(proposals.map(p => ({ ...p, scope: serializeScope(p.scope) })));
 }));
 
 app.get('/api/proposals/:id', wrap(async (req, res) => {
-  const proposal = await governance.getProposal(str(req.params.id));
+  const rawProposal = await governance.getProposal(str(req.params.id));
+  const proposal = rawProposal ? { ...rawProposal, scope: serializeScope(rawProposal.scope) } : null;
   if (!proposal) {
     res.status(404).json({ error: 'Proposal not found' });
     return;
@@ -1995,17 +2035,7 @@ app.get('/api/delegators/:identity', wrap(async (req, res) => {
 }));
 
 app.get('/api/voting-power/:identity', wrap(async (req, res) => {
-  const { level, id, address } = req.query;
-  let scope: governance.Proposal['scope'];
-  if (level === 'dao') {
-    scope = { level: 'dao', address: str(address) };
-  } else if (level === 'context') {
-    scope = { level: 'context', id: str(id) };
-  } else if (level === 'node') {
-    scope = { level: 'node', id: str(id) };
-  } else {
-    scope = { level: 'network' };
-  }
+  const scope = parseScope(req.query as Record<string, unknown>);
   const power = await governance.getVotingPower(str(req.params.identity), scope);
   res.json(power);
 }));

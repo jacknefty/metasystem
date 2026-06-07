@@ -15,6 +15,7 @@ import { listDAOs, type DAORegistration } from './registry.js';
 import { getFreeEnergy, getFreeEnergyState } from '../control/dynamics/free-energy.js';
 import { getAggregatePrecision, getPrecisionStats, type PrecisionRecord } from '../control/dynamics/precision.js';
 import { DEFAULT_PARAMETERS, type Scope } from '../control/dynamics/types.js';
+import { dao } from '../identity/scoped-paths.js';
 
 // =============================================================================
 // Types
@@ -150,8 +151,8 @@ export async function computeNetworkState(): Promise<NetworkState> {
 
   const G_network = F_network + DEFAULT_PARAMETERS.γ * H_network;
 
-  // Get network-level τ
-  const τ_aggregate = await getAggregatePrecision({ level: 'network' });
+  // Get network-level τ (use dao as network scope)
+  const τ_aggregate = await getAggregatePrecision(dao);
 
   // Compute mint rate
   const mint_rate = networkState.F_initial !== null && networkState.F_initial > 0

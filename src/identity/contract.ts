@@ -5,11 +5,13 @@
  * Chain events handle dynamic state (memberships, settings changes).
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { dirname } from 'path';
 import { createHash } from 'crypto';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { paths } from './paths.js';
 import { getChain } from '../coordination/channels/chain.js';
+import { parent, scopeKey, type ScopedPaths } from './scoped-paths.js';
 
 export interface Membership {
   context: string;
@@ -18,11 +20,20 @@ export interface Membership {
   joinedAt?: number;
 }
 
+export interface GovernanceParams {
+  quorum?: number;           // 0-1, defaults inherited from parent
+  votingPeriod?: number;     // ms, defaults inherited from parent
+  threshold?: number;        // 0-1, base approval threshold
+  capacity?: number;         // max concurrent work items
+  budget?: number;           // resource budget at this scope
+}
+
 export interface IdentityFrontmatter {
   id: string;
-  type: 'dao' | 'context' | 'node';
+  type: 'dao' | 'context' | 'story' | 'task' | 'node';
   parent?: string;
   memberships?: Membership[];
+  governance?: GovernanceParams;
   created: string;
   closes: 'never' | 'conditions';
   closed?: string;
@@ -82,6 +93,123 @@ export function loadIdentity(id: string): IdentityContract | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Load identity at any scope path.
+ * Returns the identity.md at that scope, or null if none exists.
+ */
+export function loadIdentityAtScope(scope: ScopedPaths): IdentityContract | null {
+  try {
+    const identityPath = scope.identity();
+    if (!existsSync(identityPath)) return null;
+    return parseIdentity(readFileSync(identityPath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get effective governance parameters at a scope.
+ * Walks up the hierarchy, inheriting from parent if not set locally.
+ */
+export function getEffectiveGovernance(scope: ScopedPaths): GovernanceParams {
+  const defaults: GovernanceParams = {
+    quorum: 0.3,
+    votingPeriod: 7 * 24 * 60 * 60 * 1000, // 7 days
+    threshold: 0.5,
+    capacity: 5,         // default concurrent work capacity
+    budget: 10000,       // default resource budget
+  };
+
+  // Walk up the tree collecting governance params
+  const params: GovernanceParams = { ...defaults };
+  const chain: ScopedPaths[] = [];
+
+  let current: ScopedPaths | null = scope;
+  while (current) {
+    chain.unshift(current); // Add to front so we process root first
+    current = parent(current);
+  }
+
+  // Apply params from root down (children override parents)
+  for (const s of chain) {
+    const identity = loadIdentityAtScope(s);
+    if (identity?.frontmatter.governance) {
+      const gov = identity.frontmatter.governance;
+      if (gov.quorum !== undefined) params.quorum = gov.quorum;
+      if (gov.votingPeriod !== undefined) params.votingPeriod = gov.votingPeriod;
+      if (gov.threshold !== undefined) params.threshold = gov.threshold;
+      if (gov.capacity !== undefined) params.capacity = gov.capacity;
+      if (gov.budget !== undefined) params.budget = gov.budget;
+    }
+  }
+
+  return params;
+}
+
+/**
+ * Create identity.md at a scope path if it doesn't exist.
+ */
+export function ensureIdentityAtScope(
+  scope: ScopedPaths,
+  opts: {
+    name: string;
+    purpose: string;
+    type?: 'dao' | 'context' | 'story' | 'task' | 'node';
+    governance?: GovernanceParams;
+  }
+): IdentityContract {
+  const identityPath = scope.identity();
+
+  if (existsSync(identityPath)) {
+    return parseIdentity(readFileSync(identityPath, 'utf-8'));
+  }
+
+  // Ensure directory exists
+  mkdirSync(dirname(identityPath), { recursive: true });
+
+  // Determine type from path
+  const path = scope.root();
+  let type: IdentityFrontmatter['type'] = opts.type ?? 'context';
+  if (path.includes('/stories/')) type = 'story';
+  if (path.includes('/tasks/')) type = 'task';
+  if (path.includes('/nodes/')) type = 'node';
+
+  const parentScope = parent(scope);
+  const parentPath = parentScope ? scopeKey(parentScope) : undefined;
+
+  const id = scopeKey(scope).replace(/\//g, '_').replace(/^_/, '');
+
+  const frontmatter: IdentityFrontmatter = {
+    id,
+    type,
+    parent: parentPath,
+    governance: opts.governance,
+    created: new Date().toISOString(),
+    closes: 'never',
+  };
+
+  const content = `---
+${stringifyYaml(frontmatter)}---
+
+# ${opts.name}
+
+## Purpose
+
+${opts.purpose}
+
+## Scope
+
+## Resources
+
+## Obligations
+
+## Boundaries
+`;
+
+  writeFileSync(identityPath, content);
+  return parseIdentity(content);
 }
 
 export function saveIdentity(identity: IdentityContract): void {

@@ -11,6 +11,7 @@
 import { getChain } from '../../coordination/channels/chain.js';
 import { getWork, listWork } from '../../coordination/resources/work.js';
 import { parseVerifier } from '../verify/registry.js';
+import { dao, at } from '../../identity/scoped-paths.js';
 import type {
   Scope,
   Action,
@@ -44,7 +45,7 @@ export async function selectAction(
     if (params.verboseEvents) {
       await getChain().append('action:evaluated', 'dynamics', action.target, {
         actionId: `${action.type}:${action.target}`,
-        scope,
+        scopePath: scope.root(),
         G: evaluation.G,
         pragmatic: evaluation.pragmaticValue,
         epistemic: evaluation.epistemicValue,
@@ -58,7 +59,7 @@ export async function selectAction(
 
   await getChain().append('action:selected', 'dynamics', selected.action.target, {
     actionId: `${selected.action.type}:${selected.action.target}`,
-    scope,
+    scopePath: scope.root(),
     G: selected.G,
     alternatives: candidates.length,
   });
@@ -110,11 +111,8 @@ async function estimatePostActionF(action: Action): Promise<number> {
       if (!work) return Infinity;
 
       const P_success = await estimateWorkSuccess(work.id, work.contextId);
-      const workF = await getFreeEnergy({
-        level: 'work',
-        id: work.id,
-        contextId: work.contextId,
-      });
+      const workScope = dao.context(work.contextId).task(work.id);
+      const workF = await getFreeEnergy(workScope);
 
       // Expected F = P(failure) × currentF + P(success) × 0
       return workF * (1 - P_success);
@@ -122,9 +120,7 @@ async function estimatePostActionF(action: Action): Promise<number> {
 
     case 'invoke-perception': {
       // Perception increases perceived variety
-      // Estimate from historical scan results
       const avgPerception = await getAveragePerceptionBits();
-      // This ADDS to perceived, so F increases
       return avgPerception;
     }
 
@@ -149,11 +145,8 @@ async function estimatePostActionF(action: Action): Promise<number> {
       if (!work) return Infinity;
 
       const P_success = await estimateWorkSuccess(work.id, work.contextId);
-      const workF = await getFreeEnergy({
-        level: 'work',
-        id: work.id,
-        contextId: work.contextId,
-      });
+      const workScope = dao.context(work.contextId).task(work.id);
+      const workF = await getFreeEnergy(workScope);
 
       return workF * (1 - P_success);
     }
@@ -219,16 +212,13 @@ async function estimateWorkSuccess(workId: string, contextId: string): Promise<n
   if (!work) return 0;
 
   let P_all_pass = 1.0;
+  const workScope = dao.context(contextId).task(workId);
 
   for (const condition of work.conditions) {
     if (condition.met) continue;
 
     const { type: verifierType } = parseVerifier(condition.verifier);
-    const precision = await getPrecision(verifierType, {
-      level: 'work',
-      id: workId,
-      contextId,
-    });
+    const precision = await getPrecision(verifierType, workScope);
 
     // P(this condition passes) ≈ τ
     P_all_pass *= precision.τ;
@@ -308,11 +298,10 @@ async function getRelevantPrecisions(action: Action): Promise<PrecisionRecord[]>
 // =============================================================================
 
 async function getAveragePerceptionBits(): Promise<number> {
-  // Query recent perception events to estimate average variety emitted
   const events = await getChain().recall({ type: 'variety:env:in' });
   const recent = events.filter(e => Date.now() - e.timestamp < 3600000);
 
-  if (recent.length === 0) return 10; // Default
+  if (recent.length === 0) return 10;
 
   const total = recent.reduce((sum, e) => {
     const payload = e.payload as { bits?: number };

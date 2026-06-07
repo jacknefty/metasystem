@@ -15,7 +15,7 @@ export type {
   ProposalFilter,
 } from './types.js';
 
-export { DEFAULT_VOTING_PERIODS, DEFAULT_QUORUM } from './types.js';
+export { DEFAULT_QUORUM, DEFAULT_VOTING_PERIOD } from './types.js';
 
 export {
   createProposal,

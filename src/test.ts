@@ -11,7 +11,7 @@ import { emitVariety, getResolution, mintCredit, getPendingCredits, getSystemBal
 import { createNode, getNode, listNodes, updateSettings } from './identity/node.js';
 import { getBountyPool, getPoolStats, checkClaimability, getReputation } from './coordination/resources/pool.js';
 import { runDynamicsControlTick } from './control/balance/homeostat.js';
-import { dynamicsHomeostat } from './control/dynamics/index.js';
+import { dynamicsHomeostat, clearFreeEnergyCache } from './control/dynamics/index.js';
 import { executeWork, finalizeWork } from './operation/execute.js';
 import { join } from 'path';
 import { unlinkSync, existsSync } from 'fs';
@@ -497,6 +497,9 @@ async function testControlLoop() {
 
     await finalizeWork(assignment.workId, true);
   }
+
+  // Clear cache so we get fresh F computation
+  clearFreeEnergyCache();
 
   // Check dynamics after - should be balanced (F ~ 0)
   const state2 = await dynamicsHomeostat();

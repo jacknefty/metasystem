@@ -192,14 +192,14 @@ export async function dynamicsHomeostat(
   action: 'invoke' | 'perceive' | 'equilibrium';
   selectedWork: string | null;
 }> {
-  const scope: Scope = { level: 'network' };
-  const F = await getFreeEnergy(scope);
-  const H = await getEpistemicValue(scope, params);
+  const { dao } = await import('../../identity/scoped-paths.js');
+  const F = await getFreeEnergy(dao);
+  const H = await getEpistemicValue(dao, params);
   const G = F + params.γ * H;
 
   if (F > params.invocationThreshold) {
-    const candidates = await getCandidateActions('claim-work', scope);
-    const selected = await selectAction(scope, candidates, params);
+    const candidates = await getCandidateActions('claim-work', dao);
+    const selected = await selectAction(dao, candidates, params);
     return {
       F,
       H,

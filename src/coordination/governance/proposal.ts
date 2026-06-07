@@ -1,16 +1,16 @@
 /**
  * Proposal — Create and manage proposals at any scope
  *
- * Same logic at DAO, context, node levels.
+ * Same logic at all recursion levels via path-based scoping.
  */
 
 import { randomUUID } from 'crypto';
 import type { Scope } from '../../control/dynamics/types.js';
+import { scopeId } from '../../control/dynamics/types.js';
 import type { Proposal, ProposalType, ProposalStatus, ProposalFilter } from './types.js';
-import { DEFAULT_VOTING_PERIODS } from './types.js';
 import { getChain } from '../channels/chain.js';
 import { checkApproval } from './threshold.js';
-import { loadIdentity } from '../../identity/contract.js';
+import { getEffectiveGovernance } from '../../identity/contract.js';
 import { createContext } from '../../identity/context.js';
 import { createWork, postBounty, claimWork as claimWorkFromPool } from '../resources/work.js';
 import { autoVote } from './vote.js';
@@ -23,12 +23,6 @@ export interface CreateProposalInput {
   proposer: string;
   target: string;
   resourcesRequested: number;
-}
-
-function getScopeId(scope: Scope): string {
-  if ('id' in scope) return scope.id;
-  if ('address' in scope) return scope.address;
-  return 'network';
 }
 
 export async function createProposal(input: CreateProposalInput): Promise<string> {
@@ -74,10 +68,8 @@ export async function listProposals(filter?: ProposalFilter): Promise<Proposal[]
   let proposals = events.map(e => e.payload as unknown as Proposal);
 
   if (filter?.scope) {
-    const filterId = getScopeId(filter.scope);
-    proposals = proposals.filter(p =>
-      p.scope.level === filter.scope!.level && getScopeId(p.scope) === filterId
-    );
+    const filterPath = filter.scope.root();
+    proposals = proposals.filter(p => p.scope.root() === filterPath);
   }
 
   if (filter?.status) {
@@ -144,7 +136,8 @@ async function executeProposal(proposal: Proposal): Promise<void> {
         break;
       }
       case 'amendment': {
-        await applyAmendment(getScopeId(proposal.scope), JSON.parse(proposal.target));
+        const id = scopeId(proposal.scope);
+        await applyAmendment(id, JSON.parse(proposal.target));
         break;
       }
     }
@@ -166,42 +159,8 @@ async function applyAmendment(
 }
 
 function getVotingPeriod(scope: Scope): number {
-  const defaultPeriod = DEFAULT_VOTING_PERIODS[scope.level];
-
-  if (scope.level === 'node' || scope.level === 'work' || scope.level === 'condition') {
-    return defaultPeriod;
-  }
-
-  if (!('id' in scope)) {
-    return defaultPeriod;
-  }
-
-  const identity = loadIdentity(scope.id);
-  if (!identity) return defaultPeriod;
-
-  const override = identity.resources['VotingPeriod'];
-  if (override) {
-    const parsed = parseDuration(override);
-    if (parsed > 0) return parsed;
-  }
-
-  return defaultPeriod;
-}
-
-function parseDuration(str: string): number {
-  const match = str.match(/^(\d+)\s*(d|h|m|s)?$/i);
-  if (!match) return 0;
-
-  const value = parseInt(match[1], 10);
-  const unit = (match[2] ?? 'd').toLowerCase();
-
-  switch (unit) {
-    case 'd': return value * 24 * 60 * 60 * 1000;
-    case 'h': return value * 60 * 60 * 1000;
-    case 'm': return value * 60 * 1000;
-    case 's': return value * 1000;
-    default: return value * 24 * 60 * 60 * 1000;
-  }
+  const governance = getEffectiveGovernance(scope);
+  return governance.votingPeriod ?? 7 * 24 * 60 * 60 * 1000;
 }
 
 async function triggerAutoVoting(proposal: Proposal): Promise<void> {

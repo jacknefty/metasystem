@@ -10,7 +10,9 @@
 
 import { getChain } from '../../coordination/channels/chain.js';
 import { listWork } from '../../coordination/resources/work.js';
-import { getReputation, getNodeClaims } from '../../coordination/resources/pool.js';
+import { getReputation } from '../../coordination/resources/pool.js';
+import { dao, at } from '../../identity/scoped-paths.js';
+import { getEffectiveGovernance } from '../../identity/contract.js';
 import type {
   Scope,
   Configuration,
@@ -18,12 +20,10 @@ import type {
   DynamicsState,
   DynamicsParameters,
 } from './types.js';
-import { scopeKey, clampConfig, ZERO_CONFIG, ZERO_VECTOR, DEFAULT_PARAMETERS } from './types.js';
-import { getExpectedFreeEnergy, gradientG } from './free-energy.js';
+import { scopeKey, clampConfig, ZERO_CONFIG, ZERO_VECTOR, DEFAULT_PARAMETERS, scopeId } from './types.js';
+import { getExpectedFreeEnergy, gradientG, listChildScopes } from './free-energy.js';
 import { getAggregatePrecision } from './precision.js';
 import { buildWaveFunction } from './wave.js';
-
-const AGENT_CAPACITY = 5;
 
 // State store (rebuilt from chain on startup)
 const stateStore = new Map<string, DynamicsState>();
@@ -42,7 +42,8 @@ export async function rebuildAgentState(nodeId: string): Promise<DynamicsState |
 
   const latest = events[events.length - 1];
   const payload = latest.payload as {
-    scope: Scope;
+    scopePath?: string;
+    scope?: Scope;
     Q: Configuration;
     velocity: Vector;
     G: number;
@@ -52,9 +53,14 @@ export async function rebuildAgentState(nodeId: string): Promise<DynamicsState |
     β: number;
   };
 
+  // Support both old (scope object) and new (scopePath string) formats
+  const scope: Scope = payload.scopePath
+    ? at(payload.scopePath)
+    : payload.scope ?? dao.node(nodeId);
+
   const state: DynamicsState = {
     nodeId,
-    scope: payload.scope,
+    scope,
     Q: payload.Q,
     velocity: payload.velocity,
     mass: payload.mass,
@@ -67,7 +73,7 @@ export async function rebuildAgentState(nodeId: string): Promise<DynamicsState |
     lastEvolved: latest.timestamp,
   };
 
-  const key = `${nodeId}:${scopeKey(payload.scope)}`;
+  const key = `${nodeId}:${scopeKey(scope)}`;
   stateStore.set(key, state);
 
   return state;
@@ -78,7 +84,7 @@ export async function getDynamicsState(
   scope?: Scope,
   params: DynamicsParameters = DEFAULT_PARAMETERS
 ): Promise<DynamicsState> {
-  const effectiveScope: Scope = scope ?? { level: 'node', id: nodeId };
+  const effectiveScope: Scope = scope ?? dao.node(nodeId);
   const key = `${nodeId}:${scopeKey(effectiveScope)}`;
 
   const cached = stateStore.get(key);
@@ -127,7 +133,7 @@ export async function evolveAgent(
   scope?: Scope,
   params: DynamicsParameters = DEFAULT_PARAMETERS
 ): Promise<DynamicsState> {
-  const effectiveScope: Scope = scope ?? { level: 'node', id: nodeId };
+  const effectiveScope: Scope = scope ?? dao.node(nodeId);
   const currentState = await getDynamicsState(nodeId, effectiveScope, params);
 
   // Recompute configuration from current reality
@@ -175,9 +181,9 @@ export async function evolveAgent(
   const key = `${nodeId}:${scopeKey(effectiveScope)}`;
   stateStore.set(key, newState);
 
-  // Emit evolution event
+  // Emit evolution event with scopePath
   await getChain().append('dynamics:evolved', nodeId, nodeId, {
-    scope: effectiveScope,
+    scopePath: effectiveScope.root(),
     Q: newQ,
     velocity,
     G,
@@ -208,103 +214,113 @@ export async function evolveAllAgents(
 }
 
 // =============================================================================
-// Configuration Computation
+// Configuration Computation — Unified Recursive
 // =============================================================================
 
+/**
+ * Compute configuration at any scope level using the same recursive logic.
+ *
+ * verified = fulfilled_children / total_children
+ * active = active_children / capacity (from identity.md)
+ * resources = 1 - (earnings / budget) (from identity.md)
+ *
+ * This is scale-free: same computation at DAO, context, story, task levels.
+ */
 async function computeConfiguration(
   nodeId: string,
   scope: Scope
 ): Promise<Configuration> {
-  // Configuration depends on scope level
-  switch (scope.level) {
-    case 'node': {
-      return computeNodeConfiguration(nodeId);
-    }
-    case 'context': {
-      return computeContextConfiguration(nodeId, scope.id);
-    }
-    case 'work': {
-      return computeWorkConfiguration(scope.id);
-    }
-    default: {
-      return computeNodeConfiguration(nodeId);
-    }
+  // Get governance params (capacity, budget) from identity.md with inheritance
+  const governance = getEffectiveGovernance(scope);
+  const capacity = governance.capacity ?? 5;
+  const budget = governance.budget ?? 10000;
+
+  // Get children of this scope
+  const children = await listChildScopes(scope);
+
+  // If no children, check if this is a leaf (work item with conditions)
+  if (children.length === 0) {
+    return computeLeafConfiguration(scope, capacity, budget);
   }
+
+  // Count child statuses
+  const statuses = await Promise.all(children.map(getChildStatus));
+  const fulfilled = statuses.filter(s => s === 'fulfilled').length;
+  const active = statuses.filter(s => s === 'active').length;
+  const total = children.length;
+
+  // Get earnings at this scope
+  const earnings = await getScopeEarnings(nodeId, scope);
+
+  return {
+    verified: fulfilled / total,
+    active: Math.min(1, active / capacity),
+    resources: Math.max(0, 1 - (earnings / budget)),
+  };
 }
 
-async function computeNodeConfiguration(nodeId: string): Promise<Configuration> {
+/**
+ * Get the status of a child scope (fulfilled, active, or pending).
+ */
+async function getChildStatus(child: Scope): Promise<'fulfilled' | 'active' | 'pending'> {
+  const childId = scopeId(child);
+
+  // Check if this child is a work item
   const allWork = await listWork({});
-  const nodeWork = allWork.filter(w =>
-    w.claim?.nodeId === nodeId || w.ownerId === nodeId
+  const work = allWork.find(w => w.id === childId);
+
+  if (work) {
+    if (work.status === 'fulfilled') return 'fulfilled';
+    if (work.status === 'active' || work.status === 'executing') return 'active';
+    return 'pending';
+  }
+
+  // For non-work scopes (contexts, etc.), check chain events
+  const events = await getChain().recall({ subject: childId });
+  const closedEvent = events.find(e => e.type === 'identity:closed');
+  if (closedEvent) return 'fulfilled';
+
+  const activeEvents = events.filter(e =>
+    e.type === 'work:created' || e.type === 'context:created'
   );
+  if (activeEvents.length > 0) return 'active';
 
-  const fulfilled = nodeWork.filter(w => w.status === 'fulfilled').length;
-  const active = nodeWork.filter(w =>
-    w.status === 'active' || w.status === 'executing'
-  ).length;
-  const total = nodeWork.length || 1;
-
-  const reputation = await getReputation(nodeId);
-
-  return {
-    verified: fulfilled / total,
-    active: Math.min(1, active / AGENT_CAPACITY),
-    resources: Math.max(0, 1.0 - (reputation.totalEarned / 10000)),
-  };
+  return 'pending';
 }
 
-async function computeContextConfiguration(
-  nodeId: string,
-  contextId: string
+/**
+ * Compute configuration for a leaf scope (no children).
+ * For work items, children are conditions.
+ */
+async function computeLeafConfiguration(
+  scope: Scope,
+  capacity: number,
+  budget: number
 ): Promise<Configuration> {
-  const contextWork = await listWork({ contextId });
-  const nodeWork = contextWork.filter(w =>
-    w.claim?.nodeId === nodeId || w.ownerId === nodeId
-  );
+  const id = scopeId(scope);
 
-  const fulfilled = nodeWork.filter(w => w.status === 'fulfilled').length;
-  const active = nodeWork.filter(w =>
-    w.status === 'active' || w.status === 'executing'
-  ).length;
-  const total = nodeWork.length || 1;
+  // Check if this is a work item with conditions
+  const allWork = await listWork({});
+  const work = allWork.find(w => w.id === id);
 
-  // Context-specific earnings (simplified)
-  const events = await getChain().recall({ subject: nodeId, type: 'credit:earned' });
-  const contextEarnings = events
-    .filter(e => {
-      const p = e.payload as { contextId?: string };
-      return p.contextId === contextId;
-    })
-    .reduce((sum, e) => {
-      const p = e.payload as { bits?: number };
-      return sum + (p.bits ?? 0);
-    }, 0);
+  if (work) {
+    const totalConditions = work.conditions.length || 1;
+    const metConditions = work.conditions.filter(c => c.met).length;
+    const isActive = work.status === 'active' || work.status === 'executing';
 
-  return {
-    verified: fulfilled / total,
-    active: Math.min(1, active / AGENT_CAPACITY),
-    resources: Math.max(0, 1.0 - (contextEarnings / 1000)),
-  };
-}
+    return {
+      verified: metConditions / totalConditions,
+      active: isActive ? 1 : 0,
+      resources: work.bounty ? 1 : 0,
+    };
+  }
 
-async function computeWorkConfiguration(workId: string): Promise<Configuration> {
-  const work = await listWork({}).then(all => all.find(w => w.id === workId));
-  if (!work) return ZERO_CONFIG;
-
-  const totalConditions = work.conditions.length || 1;
-  const metConditions = work.conditions.filter(c => c.met).length;
-
-  const isActive = work.status === 'active' || work.status === 'executing';
-
-  return {
-    verified: metConditions / totalConditions,
-    active: isActive ? 1 : 0,
-    resources: work.bounty ? 1 : 0,
-  };
+  // Empty scope with no work
+  return ZERO_CONFIG;
 }
 
 // =============================================================================
-// Mass Computation — Scope-Specific
+// Mass Computation — Path-Based
 // =============================================================================
 
 async function computeMass(
@@ -312,11 +328,7 @@ async function computeMass(
   scope: Scope
 ): Promise<number> {
   const baseMass = 1;
-
-  // Get scope-specific earnings
   const earnings = await getScopeEarnings(nodeId, scope);
-
-  // mass = baseMass + earnings × 0.001
   return baseMass + earnings * 0.001;
 }
 
@@ -325,43 +337,26 @@ async function getScopeEarnings(
   scope: Scope
 ): Promise<number> {
   const events = await getChain().recall({ subject: nodeId, type: 'credit:earned' });
+  const scopePath = scope.root();
+  const { dao } = await import('../../identity/scoped-paths.js');
+  const isRoot = scopePath === dao.root();
 
-  switch (scope.level) {
-    case 'node': {
-      // All earnings for this node
-      return events.reduce((sum, e) => {
-        const p = e.payload as { bits?: number };
-        return sum + (p.bits ?? 0);
-      }, 0);
-    }
-    case 'context': {
-      // Earnings in this context only
-      return events
-        .filter(e => {
-          const p = e.payload as { contextId?: string };
-          return p.contextId === scope.id;
-        })
-        .reduce((sum, e) => {
-          const p = e.payload as { bits?: number };
-          return sum + (p.bits ?? 0);
-        }, 0);
-    }
-    case 'work': {
-      // Earnings from this specific work
-      return events
-        .filter(e => {
-          const p = e.payload as { workId?: string };
-          return p.workId === scope.id;
-        })
-        .reduce((sum, e) => {
-          const p = e.payload as { bits?: number };
-          return sum + (p.bits ?? 0);
-        }, 0);
-    }
-    default: {
-      return 0;
-    }
-  }
+  return events
+    .filter(e => {
+      const p = e.payload as { scopePath?: string };
+
+      // New format: match scopePath prefix
+      if (p.scopePath) {
+        return p.scopePath.startsWith(scopePath);
+      }
+
+      // Legacy format without scopePath: include only at root
+      return isRoot;
+    })
+    .reduce((sum, e) => {
+      const p = e.payload as { bits?: number };
+      return sum + (p.bits ?? 0);
+    }, 0);
 }
 
 // =============================================================================

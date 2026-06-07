@@ -175,8 +175,8 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
     { id: 'wave', label: 'Wave' },
     { id: 'particle', label: 'Particle' },
     { id: 'identity', label: 'Identity' },
-    { id: 'governance', label: 'Governance' },
     { id: 'bounties', label: 'Bounties' },
+    { id: 'governance', label: 'Governance' },
     { id: 'work', label: `Work (${work.length})` },
     { id: 'settings', label: 'Settings' },
   ] as const;
@@ -264,6 +264,12 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
         {activeTab === 'audits' && isDAO && (
           <div className="h-full -mx-5 -mb-5 overflow-auto">
             <AuditPanel daoAddress={nodeId as `0x${string}`} />
+          </div>
+        )}
+
+        {activeTab === 'governance' && (
+          <div className="h-full -mx-5 -mb-5 overflow-auto">
+            <GovernancePanel nodeId={nodeId} />
           </div>
         )}
 

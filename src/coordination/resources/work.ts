@@ -111,10 +111,13 @@ export async function postBounty(
   });
 
   // Emit perceived variety — work posted = uncertainty perceived
+  // Use DAO root as scopePath so it aggregates in F computation
+  const { dao } = await import('../../identity/scoped-paths.js');
   await emitPerceived(work.ownerId, workId, bountyAmount, {
     context: 'work posted',
     contextId: work.contextId,
     daoAddress: work.daoAddress,
+    scopePath: dao.root(),
   });
 }
 
@@ -249,11 +252,13 @@ export async function completeWork(workId: string): Promise<void> {
 
   // P0 Fix: Close the variety loop — emit resolution
   if (bountyAmount > 0) {
+    const { dao } = await import('../../identity/scoped-paths.js');
     await emitResolved(nodeId, workId, bountyAmount, {
       workId,
       context: 'work completed',
       contextId: work.contextId,
       daoAddress: work.daoAddress,
+      scopePath: dao.root(),
     });
   }
 

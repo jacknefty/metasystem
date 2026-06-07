@@ -6,6 +6,7 @@
  */
 
 import type { Scope } from '../../control/dynamics/types.js';
+import { scopeKey as getScopeKey } from '../../control/dynamics/types.js';
 import { getChain } from '../channels/chain.js';
 
 export interface Delegation {
@@ -140,17 +141,11 @@ function scopesMatch(a: Scope | null, b: Scope | null): boolean {
   if (a === null && b === null) return true;
   if (a === null || b === null) return false;
 
-  if (a.level !== b.level) return false;
-
-  if ('id' in a && 'id' in b) return a.id === b.id;
-  if ('address' in a && 'address' in b) return a.address === b.address;
-
-  return a.level === 'network' && b.level === 'network';
+  // Compare by path
+  return a.root() === b.root();
 }
 
 function scopeKey(scope: Scope | null): string {
   if (scope === null) return 'global';
-  if ('id' in scope) return `${scope.level}:${scope.id}`;
-  if ('address' in scope) return `${scope.level}:${scope.address}`;
-  return scope.level;
+  return getScopeKey(scope);
 }

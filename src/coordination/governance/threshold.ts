@@ -2,20 +2,21 @@
  * Threshold Computation — Scale-free approval thresholds
  *
  * Threshold scales with resource ratio: larger asks need stronger consensus.
+ * Quorum and base threshold inherited from scope's identity.md.
  */
 
 import type { Scope } from '../../control/dynamics/types.js';
 import type { Proposal, ApprovalResult, Vote } from './types.js';
-import { DEFAULT_QUORUM } from './types.js';
 import { getResourcesAtScope, getVotersAtScope, getTotalContribution } from './power.js';
-import { loadIdentity } from '../../identity/contract.js';
+import { getEffectiveGovernance } from '../../identity/contract.js';
 import { getChain } from '../channels/chain.js';
 
 export async function computeThreshold(proposal: Proposal): Promise<number> {
+  const governance = getEffectiveGovernance(proposal.scope);
   const totalResources = await getResourcesAtScope(proposal.scope);
   const resourceRatio = proposal.resourcesRequested / Math.max(totalResources, 1);
 
-  const baseThreshold = 0.5;
+  const baseThreshold = governance.threshold ?? 0.5;
   const scaleFactor = 0.3;
 
   const threshold = baseThreshold + scaleFactor * resourceRatio;
@@ -23,26 +24,8 @@ export async function computeThreshold(proposal: Proposal): Promise<number> {
 }
 
 export function getQuorum(scope: Scope): number {
-  if (scope.level === 'node' || scope.level === 'work' || scope.level === 'condition') {
-    return DEFAULT_QUORUM;
-  }
-
-  if (!('id' in scope)) {
-    return DEFAULT_QUORUM;
-  }
-
-  const identity = loadIdentity(scope.id);
-  if (!identity) return DEFAULT_QUORUM;
-
-  const override = identity.resources['Quorum'];
-  if (override) {
-    const parsed = parseFloat(override);
-    if (!isNaN(parsed) && parsed > 0 && parsed <= 1) {
-      return parsed;
-    }
-  }
-
-  return DEFAULT_QUORUM;
+  const governance = getEffectiveGovernance(scope);
+  return governance.quorum ?? 0.3;
 }
 
 export async function checkApproval(proposal: Proposal): Promise<ApprovalResult> {

@@ -322,7 +322,7 @@ export interface EventPayloads {
   };
 
   'dynamics:evolved': {
-    scope: { level: string; id?: string; contextId?: string };
+    scopePath: string;
     Q: { verified: number; active: number; resources: number };
     velocity: { verified: number; active: number; resources: number };
     G: number;  // expected free energy = F + γH
@@ -334,7 +334,7 @@ export interface EventPayloads {
 
   'action:evaluated': {
     actionId: string;
-    scope: { level: string; id?: string; contextId?: string };
+    scopePath: string;
     G: number;
     pragmatic: number;
     epistemic: number;
@@ -342,14 +342,14 @@ export interface EventPayloads {
 
   'action:selected': {
     actionId: string;
-    scope: { level: string; id?: string; contextId?: string };
+    scopePath: string;
     G: number;
     alternatives: number;
   };
 
   'precision:prediction': {
     key: string;
-    scope: { level: string; id?: string; contextId?: string };
+    scopePath: string;
     predictedOutcome: number;
     source: string;
     sourceWeight: number;
@@ -357,7 +357,7 @@ export interface EventPayloads {
 
   'precision:observation': {
     key: string;
-    scope: { level: string; id?: string; contextId?: string };
+    scopePath: string;
     actualOutcome: number;
     predictionId: string;
     squaredError: number;
@@ -365,7 +365,7 @@ export interface EventPayloads {
 
   'precision:updated': {
     key: string;
-    scope: { level: string; id?: string; contextId?: string };
+    scopePath: string;
     τ: number;
     samples: number;
     runningError: number;

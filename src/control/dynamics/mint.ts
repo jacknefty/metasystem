@@ -10,6 +10,7 @@
 
 import { getChain } from '../../coordination/channels/chain.js';
 import { getWork } from '../../coordination/resources/work.js';
+import { dao } from '../../identity/scoped-paths.js';
 import type { Scope, DynamicsParameters } from './types.js';
 import { DEFAULT_PARAMETERS } from './types.js';
 import { getFreeEnergy } from './free-energy.js';
@@ -43,8 +44,7 @@ export function getNetworkState(): NetworkState {
 }
 
 export async function refreshNetworkState(): Promise<NetworkState> {
-  const scope: Scope = { level: 'network' };
-  const F_network = await getFreeEnergy(scope);
+  const F_network = await getFreeEnergy(dao);
 
   // Genesis snapshot: first time F > 0
   if (networkState.F_initial === null && F_network > 0) {
@@ -137,11 +137,7 @@ export async function mintOnCompletion(
   // Refresh network state
   await refreshNetworkState();
 
-  const scope: Scope = {
-    level: 'work',
-    id: workId,
-    contextId: work.contextId,
-  };
+  const scope = dao.context(work.contextId).task(workId);
 
   // Compute ΔF (variety resolved by this work)
   const F_before = work.conditions.reduce((sum, c) => sum + (c.varietyWeight ?? 10), 0);

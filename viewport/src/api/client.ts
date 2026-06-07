@@ -812,7 +812,7 @@ export interface SystemConstants {
   };
   governance: {
     defaultQuorum: number;
-    votingPeriods: Record<string, number>;
+    defaultVotingPeriod: number;
     thresholdFormula: {
       baseThreshold: number;
       scaleFactor: number;
@@ -846,7 +846,7 @@ export interface VotingPower {
 export interface Proposal {
   id: string;
   type: 'context' | 'work' | 'claim' | 'amendment';
-  scope: { level: string; id?: string; address?: string };
+  scope: { level: string; id?: string; path: string };
   proposer: string;
   target: string;
   resourcesRequested: number;
@@ -905,7 +905,7 @@ export async function fetchDelegations(identity: string): Promise<Array<{ to: st
 // =============================================================================
 
 export interface FreeEnergyAggregateState {
-  scope: { level: string; id?: string; address?: string };
+  scope: { level: string; id?: string; path: string };
   F_local: number;
   F_children: number;
   F_total: number;
