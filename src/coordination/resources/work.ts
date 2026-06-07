@@ -239,6 +239,14 @@ export async function completeWork(workId: string): Promise<void> {
     bountyAmount: work.bounty?.amount ?? 0,
     completedAt: Date.now(),
   });
+
+  runVerificationAsync(workId, work.claim.nodeId);
+}
+
+function runVerificationAsync(workId: string, nodeId: string): void {
+  import('../../control/verify/completion.js').then(({ verifyCompletion }) => {
+    verifyCompletion(workId, nodeId).catch(() => {});
+  }).catch(() => {});
 }
 
 export async function failWork(workId: string, reason: string): Promise<void> {

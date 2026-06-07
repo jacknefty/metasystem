@@ -1,8 +1,19 @@
 /**
- * Audit Module — S3* Sporadic Verification
+ * Audit Module (S3*)
  *
- * Note: Access logging (security audit) is in identity/boundary/audit-log.ts
+ * Sporadic re-verification at each recursion level.
  */
 
-export * from './spot.js';
-export * from './assess.js';
+export type {
+  NodeAuditResult,
+  ContextAuditResult,
+  DaoAuditResult,
+  AuditFinding,
+} from './types.js';
+
+export { auditOwnWork } from './node/audit.js';
+export { checkCreditIntegrity } from './node/checks/index.js';
+export { auditNodeVerification } from './context/audit.js';
+export { auditContextAudit } from './dao/audit.js';
+
+export { selfAssess } from './assess.js';

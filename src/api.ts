@@ -812,6 +812,36 @@ app.post('/api/work/:id/assess', wrap(async (req, res) => {
   res.json(result);
 }));
 
+// --- S3 Verification ---
+import { verifyCompletion } from './control/verify/completion.js';
+
+app.post('/api/verify/:workId', wrap(async (req, res) => {
+  const { nodeId } = req.body;
+  const result = await verifyCompletion(str(req.params.workId), nodeId);
+  res.json(result);
+}));
+
+// --- S3* Audit ---
+import { auditOwnWork } from './audit/node/audit.js';
+import { auditNodeVerification } from './audit/context/audit.js';
+import { auditContextAudit } from './audit/dao/audit.js';
+
+app.post('/api/audit/node/:nodeId', wrap(async (req, res) => {
+  const result = await auditOwnWork(str(req.params.nodeId));
+  res.json(result ?? { message: 'No verifications to audit' });
+}));
+
+app.post('/api/audit/context/:contextId', wrap(async (req, res) => {
+  const result = await auditNodeVerification(str(req.params.contextId));
+  res.json(result ?? { message: 'No node verifications to audit' });
+}));
+
+app.post('/api/audit/dao', wrap(async (req, res) => {
+  const { daoId } = req.body;
+  const result = await auditContextAudit(daoId ?? 'dao');
+  res.json(result ?? { message: 'No context audits to audit' });
+}));
+
 // --- Strategy ---
 app.get('/api/contexts/:id/coupling', wrap(async (req, res) => {
   const analysis = await analyzeCoupling(str(req.params.id));

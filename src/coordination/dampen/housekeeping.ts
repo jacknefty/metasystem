@@ -2,12 +2,18 @@
  * S2 Housekeeping
  *
  * Detects starvation and hoarding. Runs on work state change events.
+ * Triggers sporadic S3* audits at each recursion level.
  */
 
 import { listWork } from '../../coordination/resources/work.js';
 import { emitPain } from '../channels/algedonic.js';
 import { getChain } from '../../coordination/channels/chain.js';
 import type { DerivedWork } from '../../coordination/resources/derive.js';
+import { auditOwnWork } from '../../audit/node/audit.js';
+import { auditNodeVerification } from '../../audit/context/audit.js';
+import { auditContextAudit } from '../../audit/dao/audit.js';
+import { listNodes } from '../../identity/node.js';
+import { listContexts } from '../../identity/context.js';
 
 const STARVATION_THRESHOLD_MS = 10 * 60 * 1000;
 const HOARDING_THRESHOLD_MS = 60 * 60 * 1000;
@@ -139,4 +145,41 @@ export async function maybeRunHousekeeping(): Promise<void> {
 
   lastRun = now;
   await runHousekeeping();
+
+  await maybeRunSporadicAudits();
+}
+
+async function maybeRunSporadicAudits(): Promise<void> {
+  try {
+    if (Math.random() < 0.1) {
+      const nodes = await listNodes({ status: 'active' });
+      if (nodes.length > 0) {
+        const node = nodes[Math.floor(Math.random() * nodes.length)];
+        const result = await auditOwnWork(node.id);
+        if (result?.drift) {
+          console.log(`[S3*] Node self-audit drift: ${node.id}`);
+        }
+      }
+    }
+
+    if (Math.random() < 0.05) {
+      const contexts = listContexts();
+      if (contexts.length > 0) {
+        const context = contexts[Math.floor(Math.random() * contexts.length)];
+        const result = await auditNodeVerification(context.frontmatter.id);
+        if (result?.drift) {
+          console.log(`[S3*] Context audit drift: ${context.frontmatter.id}`);
+        }
+      }
+    }
+
+    if (Math.random() < 0.02) {
+      const result = await auditContextAudit('dao');
+      if (result?.drift) {
+        console.log(`[S3*] DAO audit drift: ${result.contextId}`);
+      }
+    }
+  } catch (err) {
+    console.error('[S3*] Sporadic audit error:', err);
+  }
 }

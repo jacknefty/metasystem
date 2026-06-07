@@ -111,7 +111,13 @@ export type EventType =
   | 'vote:cast'
   | 'delegation:created'
   | 'delegation:revoked'
-  | 'identity:amended';
+  | 'identity:amended'
+  // Verification (S3)
+  | 'verify:completion'
+  // Audit (S3*)
+  | 'audit:node'
+  | 'audit:context'
+  | 'audit:dao';
 
 export interface Condition {
   id: string;
@@ -629,6 +635,45 @@ export interface EventPayloads {
   };
 
   'identity:amended': Record<string, unknown>;
+
+  // Verification (S3)
+  'verify:completion': {
+    workId: string;
+    nodeId: string;
+    timestamp: number;
+    checks: Array<{ check: string; passed: boolean; evidence?: string }>;
+    passed: boolean;
+  };
+
+  // Audit (S3*)
+  'audit:node': {
+    nodeId: string;
+    workId: string;
+    originalPassed: boolean;
+    reVerificationPassed: boolean;
+    drift: boolean;
+    driftDetails?: string;
+  };
+
+  'audit:context': {
+    contextId: string;
+    nodeId: string;
+    workId: string;
+    nodeVerificationPassed: boolean;
+    ourVerificationPassed: boolean;
+    drift: boolean;
+    driftDetails?: string;
+  };
+
+  'audit:dao': {
+    daoId: string;
+    contextId: string;
+    nodeId: string;
+    workId: string;
+    contextSaidDrift: boolean;
+    weSayDrift: boolean;
+    drift: boolean;
+  };
 }
 
 export interface ChainEvent<T extends EventType = EventType> {
