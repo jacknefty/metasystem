@@ -23,8 +23,8 @@ export interface Finding {
 }
 
 export interface PerceptionResult {
-  contextId: string;
-  contextPath?: string;
+  hubId: string;
+  hubPath?: string;
   findings: Finding[];
   varietyEmitted: number;
   perceivedAt: number;
@@ -47,72 +47,72 @@ const DEFAULT_OPTIONS: ScanOptions = {
 };
 
 export async function perceiveEnvironment(
-  contextId: string,
+  hubId: string,
   options: ScanOptions = {}
 ): Promise<PerceptionResult> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const context = await getNode(contextId);
+  const context = await getNode(hubId);
 
   if (!context?.settings.path) {
     return {
-      contextId,
+      hubId,
       findings: [],
       varietyEmitted: 0,
       perceivedAt: Date.now(),
     };
   }
 
-  const contextPath = context.settings.path;
+  const hubPath = context.settings.path;
   const findings: Finding[] = [];
 
   if (opts.includeGit) {
-    findings.push(...scanGitStatus(contextPath));
+    findings.push(...scanGitStatus(hubPath));
   }
 
   if (opts.includeTodo) {
-    findings.push(...scanTodoComments(contextPath));
+    findings.push(...scanTodoComments(hubPath));
   }
 
   if (opts.includeTests) {
-    findings.push(...scanMissingTests(contextPath));
+    findings.push(...scanMissingTests(hubPath));
   }
 
   if (opts.includeDeps) {
-    findings.push(...scanDependencies(contextPath));
+    findings.push(...scanDependencies(hubPath));
   }
 
   let varietyEmitted = 0;
   for (const finding of findings) {
     const bits = finding.severity * 5;
-    await emitVariety('env', 'in', 's4', contextId, bits, {
+    await emitVariety('env', 'in', 's4', hubId, bits, {
       context: finding.source,
     });
     varietyEmitted += bits;
   }
 
   if (opts.createWork && findings.length > 0) {
-    await createWorkFromFindings(contextId, contextPath, findings);
+    await createWorkFromFindings(hubId, hubPath, findings);
   }
 
   if (findings.length > 0) {
-    console.log(`[S4] Perceived ${findings.length} findings (${varietyEmitted} bits) in ${contextId}`);
+    console.log(`[S4] Perceived ${findings.length} findings (${varietyEmitted} bits) in ${hubId}`);
   }
 
   return {
-    contextId,
-    contextPath,
+    hubId,
+    hubPath,
     findings,
     varietyEmitted,
     perceivedAt: Date.now(),
   };
 }
 
-function scanGitStatus(contextPath: string): Finding[] {
+function scanGitStatus(hubPath: string): Finding[] {
   const findings: Finding[] = [];
 
   try {
     const status = execSync('git status --porcelain', {
-      cwd: contextPath,
+      cwd: hubPath,
       encoding: 'utf-8',
     }).trim();
 
@@ -144,7 +144,7 @@ function scanGitStatus(contextPath: string): Finding[] {
 
     try {
       const unpushed = execSync('git log @{u}..HEAD --oneline 2>/dev/null || echo ""', {
-        cwd: contextPath,
+        cwd: hubPath,
         encoding: 'utf-8',
       }).trim();
 
@@ -164,7 +164,7 @@ function scanGitStatus(contextPath: string): Finding[] {
 
     try {
       const branches = execSync('git branch --merged main 2>/dev/null | grep -v main | wc -l', {
-        cwd: contextPath,
+        cwd: hubPath,
         encoding: 'utf-8',
       }).trim();
 
@@ -188,14 +188,14 @@ function scanGitStatus(contextPath: string): Finding[] {
   return findings;
 }
 
-function scanTodoComments(contextPath: string): Finding[] {
+function scanTodoComments(hubPath: string): Finding[] {
   const findings: Finding[] = [];
 
   try {
     const result = execSync(
       'grep -rn --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" ' +
       '"TODO\\|FIXME\\|HACK\\|XXX" . 2>/dev/null | head -50',
-      { cwd: contextPath, encoding: 'utf-8' }
+      { cwd: hubPath, encoding: 'utf-8' }
     ).trim();
 
     if (result) {
@@ -241,18 +241,18 @@ function scanTodoComments(contextPath: string): Finding[] {
   return findings;
 }
 
-function scanMissingTests(contextPath: string): Finding[] {
+function scanMissingTests(hubPath: string): Finding[] {
   const findings: Finding[] = [];
 
   try {
-    const srcDir = join(contextPath, 'src');
+    const srcDir = join(hubPath, 'src');
     if (!existsSync(srcDir)) return findings;
 
     const sourceFiles = findFiles(srcDir, /\.(ts|js|tsx|jsx)$/)
       .filter(f => !f.includes('.test.') && !f.includes('.spec.') && !f.includes('__tests__'));
 
     const testFiles = new Set(
-      findFiles(contextPath, /\.(test|spec)\.(ts|js|tsx|jsx)$/)
+      findFiles(hubPath, /\.(test|spec)\.(ts|js|tsx|jsx)$/)
         .map(f => f.replace(/\.(test|spec)\./, '.'))
     );
 
@@ -279,10 +279,10 @@ function scanMissingTests(contextPath: string): Finding[] {
   return findings;
 }
 
-function scanDependencies(contextPath: string): Finding[] {
+function scanDependencies(hubPath: string): Finding[] {
   const findings: Finding[] = [];
 
-  const pkgPath = join(contextPath, 'package.json');
+  const pkgPath = join(hubPath, 'package.json');
   if (!existsSync(pkgPath)) return findings;
 
   try {
@@ -326,8 +326,8 @@ function scanDependencies(contextPath: string): Finding[] {
 }
 
 async function createWorkFromFindings(
-  contextId: string,
-  contextPath: string,
+  hubId: string,
+  hubPath: string,
   findings: Finding[]
 ): Promise<void> {
   const byType = new Map<string, Finding[]>();
@@ -348,9 +348,9 @@ async function createWorkFromFindings(
 
     const input: CreateWorkInput = {
       name: `Address ${representative.source} ${representative.type}s`,
-      contextId,
-      contextPath,
-      ownerId: contextId,
+      hubId,
+      hubPath,
+      ownerId: hubId,
       conditions: [
         {
           id: `${key}-resolved`,

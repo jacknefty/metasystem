@@ -7,8 +7,8 @@
 
 import { invoke } from './invoke.js';
 import { listTools } from './index.js';
-import { emitPain } from '../coordination/channels/algedonic.js';
-import { getChain } from '../coordination/channels/chain.js';
+import { emitPain } from '../../coordination/channels/algedonic.js';
+import { getChain } from '../../coordination/channels/chain.js';
 import type { ToolResult } from './types.js';
 
 const AUDIT_SAMPLE_RATE = 0.1;

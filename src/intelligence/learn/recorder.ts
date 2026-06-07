@@ -60,7 +60,7 @@ export async function recordOutcome(workId: string): Promise<LearningRecord | nu
   const record: LearningRecord = {
     workId,
     nodeId,
-    contextId: work.contextId,
+    hubId: work.hubId,
     outcome,
     conditions,
     executorUsed,

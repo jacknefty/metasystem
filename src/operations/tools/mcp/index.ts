@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import type { ToolSpec, ToolProvider, ToolResult } from '../types.js';
 import { MCPClient, type MCPServerConfig } from './client.js';
-import { paths } from '../../identity/paths.js';
+import { paths } from '../../../identity/paths.js';
 
 const clients = new Map<string, MCPClient>();
 let serverConfigs: MCPServerConfig[] = [];

@@ -6,10 +6,10 @@
 
 import type { ToolInvocation, ToolResult } from './types.js';
 import { getTool, getProvider } from './index.js';
-import { checkToolAccess } from '../identity/boundary/tools.js';
+import { checkToolAccess } from '../../identity/boundary/tools.js';
 import { recordToolOutcome } from './reliability.js';
 import { extractPaths, validatePaths } from './scope.js';
-import { getChain } from '../coordination/channels/chain.js';
+import { getChain } from '../../coordination/channels/chain.js';
 
 export async function invoke(invocation: ToolInvocation): Promise<ToolResult> {
   const { toolId, parameters, context } = invocation;

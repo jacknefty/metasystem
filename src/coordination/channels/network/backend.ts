@@ -132,7 +132,7 @@ export class NetworkChain extends EventEmitter implements ChainBackend {
         subject: workId,
         payload: {
           name: workId,
-          contextId: daoAddress,
+          hubId: daoAddress,
           contextPath: '',
           conditions: [],
           networkOrigin: { ...origin, txHash },
@@ -279,7 +279,7 @@ export class NetworkChain extends EventEmitter implements ChainBackend {
           severity: severity as 1 | 2 | 3,
           source: 'network',
           message,
-          contextId: daoAddress,
+          hubId: daoAddress,
           originContextId: daoAddress,
           escalationLevel: 0,
         },

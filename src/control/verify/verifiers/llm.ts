@@ -5,7 +5,7 @@
  * verification would be needed for higher confidence.
  */
 
-import { execute } from '../../../operation/executor.js';
+import { execute } from '../../../operations/executor.js';
 import type { ConditionInput, VerifyContext, VerifierResult } from '../types.js';
 
 const CODE_REVIEW_MAX_CONFIDENCE = 0.7;

@@ -110,8 +110,8 @@ async function estimatePostActionF(action: Action): Promise<number> {
       const work = await getWork(action.target);
       if (!work) return Infinity;
 
-      const P_success = await estimateWorkSuccess(work.id, work.contextId);
-      const workScope = dao.context(work.contextId).task(work.id);
+      const P_success = await estimateWorkSuccess(work.id, work.hubId);
+      const workScope = dao.hub(work.hubId).task(work.id);
       const workF = await getFreeEnergy(workScope);
 
       // Expected F = P(failure) × currentF + P(success) × 0
@@ -144,8 +144,8 @@ async function estimatePostActionF(action: Action): Promise<number> {
       const work = await getWork(action.target);
       if (!work) return Infinity;
 
-      const P_success = await estimateWorkSuccess(work.id, work.contextId);
-      const workScope = dao.context(work.contextId).task(work.id);
+      const P_success = await estimateWorkSuccess(work.id, work.hubId);
+      const workScope = dao.hub(work.hubId).task(work.id);
       const workF = await getFreeEnergy(workScope);
 
       return workF * (1 - P_success);
@@ -207,12 +207,12 @@ async function estimateEpistemicValue(
 // Success Probability
 // =============================================================================
 
-async function estimateWorkSuccess(workId: string, contextId: string): Promise<number> {
+async function estimateWorkSuccess(workId: string, hubId: string): Promise<number> {
   const work = await getWork(workId);
   if (!work) return 0;
 
   let P_all_pass = 1.0;
-  const workScope = dao.context(contextId).task(workId);
+  const workScope = dao.hub(hubId).task(workId);
 
   for (const condition of work.conditions) {
     if (condition.met) continue;
@@ -233,7 +233,7 @@ async function estimateSuccessProbability(action: Action): Promise<number> {
     case 'execute': {
       const work = await getWork(action.target);
       if (!work) return 0;
-      return estimateWorkSuccess(work.id, work.contextId);
+      return estimateWorkSuccess(work.id, work.hubId);
     }
 
     case 'verify-condition': {

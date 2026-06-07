@@ -7,7 +7,7 @@ import { getVerifier, parseVerifier } from './registry.js';
 import type { VerifierResult, VerifyContext, ConditionInput } from './types.js';
 import { getWork, verifyWork } from '../../coordination/resources/work.js';
 import { getChain } from '../../coordination/channels/chain.js';
-import { getWorktreePath } from '../../operation/worktree.js';
+import { getWorktreePath } from '../../operations/worktree.js';
 import { enforceScope } from '../../coordination/dampen/scope.js';
 import { recordPainSignal } from '../../intelligence/learn/verifiers.js';
 
@@ -62,7 +62,7 @@ export async function runVerification(workId: string): Promise<VerifierResult[]>
 
   const context: VerifyContext = {
     workId,
-    contextId: work.contextId,
+    hubId: work.hubId,
     branch: work.submission.branch,
     workingDir,
     changedFiles,
@@ -109,7 +109,7 @@ export async function runVerification(workId: string): Promise<VerifierResult[]>
       const condition = work.conditions.find(c => c.id === result.conditionId);
       if (condition) {
         await recordPainSignal(
-          work.contextId,
+          work.hubId,
           workId,
           `Verification failed: ${result.evidence}`,
           condition.verifier

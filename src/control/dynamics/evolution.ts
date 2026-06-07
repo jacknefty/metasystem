@@ -281,7 +281,7 @@ async function getChildStatus(child: Scope): Promise<'fulfilled' | 'active' | 'p
   if (closedEvent) return 'fulfilled';
 
   const activeEvents = events.filter(e =>
-    e.type === 'work:created' || e.type === 'context:created'
+    e.type === 'work:created' || e.type === 'hub:created'
   );
   if (activeEvents.length > 0) return 'active';
 

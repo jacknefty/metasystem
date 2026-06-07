@@ -76,10 +76,10 @@ async function getEligibleVoters(scope: Scope): Promise<string[]> {
   // Also include membership events for this scope
   const memberEvents = await getChain().recall({ type: 'membership:joined' });
   for (const e of memberEvents) {
-    const payload = e.payload as { context?: string; scopePath?: string };
+    const payload = e.payload as { hub?: string; scopePath?: string };
     const id = scopeId(scope);
 
-    if (payload.scopePath?.startsWith(scopePath) || payload.context === id) {
+    if (payload.scopePath?.startsWith(scopePath) || payload.hub === id) {
       voters.add(e.subject);
     }
   }

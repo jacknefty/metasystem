@@ -62,7 +62,7 @@ export interface IdentitySettings {
 }
 
 export interface Membership {
-  context: string;
+  hub: string;
   role?: string;
   joinedAt: number;
 }
@@ -188,8 +188,8 @@ export async function fetchIdentity(id: string): Promise<Identity | null> {
   return res.data || null;
 }
 
-export async function fetchMembers(contextId: string): Promise<Identity[]> {
-  const res = await api.get<Identity[]>(`/identities/${contextId}/members`);
+export async function fetchMembers(hubId: string): Promise<Identity[]> {
+  const res = await api.get<Identity[]>(`/identities/${hubId}/members`);
   return res.data || [];
 }
 
@@ -208,13 +208,13 @@ export async function createIdentity(data: {
   return res.data || null;
 }
 
-export async function joinNode(memberId: string, contextId: string, role?: string): Promise<boolean> {
-  const res = await api.post(`/nodes/${contextId}/join`, { memberId, role });
+export async function joinNode(memberId: string, hubId: string, role?: string): Promise<boolean> {
+  const res = await api.post(`/nodes/${hubId}/join`, { memberId, role });
   return res.ok;
 }
 
-export async function leaveNode(memberId: string, contextId: string, reason?: string): Promise<boolean> {
-  const res = await api.post(`/nodes/${contextId}/leave`, { memberId, reason });
+export async function leaveNode(memberId: string, hubId: string, reason?: string): Promise<boolean> {
+  const res = await api.post(`/nodes/${hubId}/leave`, { memberId, reason });
   return res.ok;
 }
 

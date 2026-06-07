@@ -27,7 +27,7 @@ export interface ConditionInput {
 
 export interface VerifyContext {
   workId: string;
-  contextId: string;
+  hubId: string;
   branch: string;
   workingDir: string;
   changedFiles: string[];

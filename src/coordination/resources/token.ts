@@ -21,9 +21,9 @@ export type VarietyDirection = 'in' | 'out';
  * Compute ERC-1155 tokenId for a scope level.
  * - Network: tokenId = 0
  * - DAO: tokenId = uint256(daoAddress) — fits in 160 bits
- * - Context: tokenId = uint256(keccak256(daoAddress, contextId))
+ * - Hub: tokenId = uint256(keccak256(daoAddress, hubId))
  */
-export function computeTokenId(daoAddress?: string, contextId?: string): string {
+export function computeTokenId(daoAddress?: string, hubId?: string): string {
   if (!daoAddress) {
     // Network level
     return '0x0';
@@ -34,15 +34,15 @@ export function computeTokenId(daoAddress?: string, contextId?: string): string 
     ? daoAddress.toLowerCase()
     : '0x' + createHash('sha256').update(daoAddress).digest('hex').slice(0, 40);
 
-  if (!contextId) {
+  if (!hubId) {
     // DAO level — address as uint256
     return daoHex.padStart(66, '0').replace(/^0+/, '0x') || '0x0';
   }
 
-  // Context level — hash of (dao, context)
+  // Hub level — hash of (dao, hub)
   const hash = createHash('sha256')
     .update(daoHex)
-    .update(contextId)
+    .update(hubId)
     .digest('hex');
 
   return '0x' + hash;
@@ -58,7 +58,7 @@ export interface VarietyToken {
   workId?: string;
   conditionId?: string;
   context?: string;      // descriptive label
-  contextId?: string;    // scope identifier
+  hubId?: string;        // hub scope identifier
   daoAddress?: string;   // DAO scope identifier
   timestamp: number;
 }
@@ -79,7 +79,7 @@ export interface PendingCredit {
   amount: bigint;
   proofHash: string;
   tokenId: string;       // ERC-1155 tokenId (hex string for uint256)
-  contextId?: string;
+  hubId?: string;
   daoAddress?: string;
   earnedAt: number;
 }
@@ -125,7 +125,7 @@ export async function emitVariety(
     workId?: string;
     conditionId?: string;
     context?: string;      // descriptive label ("work posted", "scan complete")
-    contextId?: string;    // scope identifier for filtering
+    hubId?: string;        // hub scope identifier for filtering
     daoAddress?: string;   // DAO scope identifier
     scopePath?: string;    // full scope path for recursive F computation
   }
@@ -136,7 +136,7 @@ export async function emitVariety(
   if (opts?.workId) payload.workId = opts.workId;
   if (opts?.conditionId) payload.conditionId = opts.conditionId;
   if (opts?.context) payload.context = opts.context;
-  if (opts?.contextId) payload.contextId = opts.contextId;
+  if (opts?.hubId) payload.hubId = opts.hubId;
   if (opts?.daoAddress) payload.daoAddress = opts.daoAddress;
   if (opts?.scopePath) payload.scopePath = opts.scopePath;
 
@@ -152,7 +152,7 @@ export async function emitVariety(
     workId: opts?.workId,
     conditionId: opts?.conditionId,
     context: opts?.context,
-    contextId: opts?.contextId,
+    hubId: opts?.hubId,
     daoAddress: opts?.daoAddress,
     timestamp: event.timestamp,
   };
@@ -183,7 +183,7 @@ export async function queryTokens(filter?: {
       workId?: string;
       conditionId?: string;
       context?: string;
-      contextId?: string;
+      hubId?: string;
       daoAddress?: string;
     };
 
@@ -197,7 +197,7 @@ export async function queryTokens(filter?: {
       workId: payload.workId,
       conditionId: payload.conditionId,
       context: payload.context,
-      contextId: payload.contextId,
+      hubId: payload.hubId,
       daoAddress: payload.daoAddress,
       timestamp: event.timestamp,
     });
@@ -291,7 +291,7 @@ export async function mintCredit(workId: string, nodeId: string): Promise<Pendin
   const proofHash = generateProofHash(workId, nodeId, bits, evidenceHashes);
 
   // Compute ERC-1155 tokenId based on scope
-  const tokenId = computeTokenId(work?.daoAddress, work?.contextId);
+  const tokenId = computeTokenId(work?.daoAddress, work?.hubId);
 
   await getChain().append('credit:earned', 'system', nodeId, {
     workId,
@@ -300,7 +300,7 @@ export async function mintCredit(workId: string, nodeId: string): Promise<Pendin
     amount: amount.toString(),
     proofHash,
     tokenId,
-    contextId: work?.contextId,
+    hubId: work?.hubId,
     daoAddress: work?.daoAddress,
   });
 
@@ -312,7 +312,7 @@ export async function mintCredit(workId: string, nodeId: string): Promise<Pendin
     amount,
     proofHash,
     tokenId,
-    contextId: work?.contextId,
+    hubId: work?.hubId,
     daoAddress: work?.daoAddress,
     earnedAt: Date.now(),
   };
@@ -336,7 +336,7 @@ export async function getPendingCredits(nodeId?: string): Promise<PendingCredit[
       amount: BigInt(p.amount),
       proofHash: p.proofHash,
       tokenId: p.tokenId ?? '0x0',
-      contextId: p.contextId,
+      hubId: p.hubId,
       daoAddress: p.daoAddress,
       earnedAt: event.timestamp,
     });

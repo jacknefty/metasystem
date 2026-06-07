@@ -6,9 +6,11 @@
  */
 
 import { randomUUID } from 'crypto';
-import { execute } from '../../../operation/executor.js';
+import { execute } from '../../../operations/executor.js';
 import { createWork, postBounty, listWork } from '../../../coordination/resources/work.js';
 import { getNode } from '../../../identity/node.js';
+import { createEpic } from '../../../identity/epic.js';
+import { createStory, postStoryBounty } from '../../../identity/story.js';
 import { classifyContext } from '../../model/classify.js';
 import {
   inferWeight,
@@ -434,30 +436,75 @@ export function calculateTotalVariety(graph: WorkGraph): number {
   return total;
 }
 
+/**
+ * Create scopes from work graph using the new Epic/Story hierarchy.
+ * Stories are the bounty level.
+ */
+export async function createScopesFromGraph(
+  graph: WorkGraph,
+  hubId: string,
+  _ownerId: string
+): Promise<{ epics: string[]; stories: string[] }> {
+  const epicIds: string[] = [];
+  const storyIds: string[] = [];
+
+  for (const epic of graph.epics) {
+    const epicId = await createEpic({
+      name: epic.name,
+      outcome: epic.outcome,
+      hubId,
+    });
+    epicIds.push(epicId);
+
+    for (const story of epic.stories) {
+      const storyId = await createStory({
+        name: story.name,
+        outcome: story.outcome,
+        epicId,
+        hubId,
+        conditions: story.conditions.map(c => ({
+          id: `cond_${randomUUID().slice(0, 8)}`,
+          description: c.description,
+          verifier: c.verifier,
+          varietyWeight: c.varietyWeight,
+        })),
+        leverage: story.leverage,
+        uncertainty: story.uncertainty,
+      });
+      storyIds.push(storyId);
+
+      await postStoryBounty(storyId);
+    }
+  }
+
+  return { epics: epicIds, stories: storyIds };
+}
+
+/**
+ * @deprecated Use createScopesFromGraph instead
+ */
 export async function createWorkFromGraph(
   graph: WorkGraph,
-  contextId: string,
+  hubId: string,
   ownerId: string
 ): Promise<string[]> {
-  const context = await getNode(contextId);
-  const contextPath = context?.settings?.path;
+  const context = await getNode(hubId);
+  const hubPath = context?.settings?.path;
 
   const createdIds: string[] = [];
-  // Map story IDs to created work IDs for dependency resolution
   const storyToWorkId = new Map<string, string>();
 
   for (const epic of graph.epics) {
     for (const story of epic.stories) {
       try {
-        // Map story dependsOn IDs to actual work IDs
         const resolvedDeps = story.dependsOn
           .map(dep => storyToWorkId.get(dep))
           .filter((id): id is string => !!id);
 
         const workId = await createWork({
           name: story.name,
-          contextId,
-          contextPath,
+          hubId,
+          hubPath,
           ownerId,
           conditions: story.conditions.map(c => ({
             id: `cond-${c.description.slice(0, 20).replace(/\W/g, '-')}-${randomUUID().slice(0, 4)}`,

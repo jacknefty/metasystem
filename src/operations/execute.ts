@@ -38,7 +38,7 @@ export interface OperationContext {
   conditions: Array<{ id: string; description: string; verifier: string }>;
   varietyBits: number;
   executor: string;
-  contextPath?: string;
+  hubPath?: string;
 }
 
 export async function buildContext(
@@ -66,7 +66,7 @@ export async function buildContext(
     })),
     varietyBits,
     executor: worker.settings.executor ?? 'claude',
-    contextPath: work.contextPath,
+    hubPath: work.hubPath,
   };
 }
 
@@ -106,18 +106,18 @@ export async function executeWork(
   }
 
   // Resolve context path - try work first, then fall back to context node
-  let contextPath: string | undefined = work.contextPath;
-  if (!contextPath && work.contextId) {
-    const context = await getNode(work.contextId);
-    contextPath = context?.settings?.path as string | undefined;
+  let hubPath: string | undefined = work.hubPath;
+  if (!hubPath && work.hubId) {
+    const context = await getNode(work.hubId);
+    hubPath = context?.settings?.path as string | undefined;
   }
 
-  if (!contextPath) {
+  if (!hubPath) {
     await chain.append('algedonic:pain', 'executor', workId, {
       severity: 3,
       source: 'no-context-path',
       message: 'Work has no project path - cannot execute without a filesystem location',
-      contextId: work.contextId,
+      hubId: work.hubId,
     });
 
     return {
@@ -130,12 +130,12 @@ export async function executeWork(
   }
 
   // Check for git repo
-  if (!existsSync(join(contextPath, '.git'))) {
+  if (!existsSync(join(hubPath, '.git'))) {
     await chain.append('algedonic:pain', 'executor', workId, {
       severity: 3,
       source: 'no-git-repo',
-      message: `Project path ${contextPath} is not a git repository`,
-      contextId: work.contextId,
+      message: `Project path ${hubPath} is not a git repository`,
+      hubId: work.hubId,
     });
 
     return {
@@ -206,13 +206,13 @@ export async function executeWork(
     // Create isolated worktree
     let worktree;
     try {
-      worktree = await createWorktree(workId, contextPath);
+      worktree = await createWorktree(workId, hubPath);
     } catch (err) {
       await chain.append('algedonic:pain', 'executor', workId, {
         severity: 2,
         source: 'worktree-creation',
         message: err instanceof Error ? err.message : 'Failed to create worktree',
-        contextId: work.contextId,
+        hubId: work.hubId,
       });
 
       await securityProvider.invalidateSession(securityCtx.sessionId);
@@ -256,7 +256,7 @@ export async function executeWork(
         severity: 2,
         source: 'execution-failed',
         message: result.error || 'Execution failed',
-        contextId: work.contextId,
+        hubId: work.hubId,
       });
 
       await securityProvider.invalidateSession(securityCtx.sessionId);
@@ -279,7 +279,7 @@ export async function executeWork(
         severity: 1,
         source: 'commit-failed',
         message: commitResult.error || 'Failed to commit changes',
-        contextId: work.contextId,
+        hubId: work.hubId,
       });
     }
 

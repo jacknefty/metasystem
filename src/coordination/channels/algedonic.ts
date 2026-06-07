@@ -17,8 +17,8 @@ export interface AlgedonicSignal {
   source: string;
   message: string;
   subject: string;
-  contextId?: string;
-  originContextId?: string;
+  hubId?: string;
+  originHubId?: string;
   escalationLevel: number;
   timestamp: number;
   acknowledged: boolean;
@@ -34,14 +34,14 @@ export async function emitPain(
   subject: string,
   message: string,
   severity: 1 | 2 | 3 = 2,
-  contextId?: string
+  hubId?: string
 ): Promise<AlgedonicSignal> {
   const event = await getChain().append('algedonic:pain', source, subject, {
     severity,
     source,
     message,
-    contextId,
-    originContextId: contextId,
+    hubId,
+    originHubId: hubId,
     escalationLevel: 0,
   });
 
@@ -52,14 +52,14 @@ export async function emitPain(
     source,
     message,
     subject,
-    contextId,
-    originContextId: contextId,
+    hubId,
+    originHubId: hubId,
     escalationLevel: 0,
     timestamp: event.timestamp,
     acknowledged: false,
   };
 
-  if (severity >= ESCALATION_THRESHOLD && contextId) {
+  if (severity >= ESCALATION_THRESHOLD && hubId) {
     await escalatePain(signal);
   }
 
@@ -71,13 +71,13 @@ export async function emitPleasure(
   subject: string,
   message: string,
   significance: 1 | 2 | 3 = 2,
-  contextId?: string
+  hubId?: string
 ): Promise<AlgedonicSignal> {
   const event = await getChain().append('algedonic:pleasure', source, subject, {
     significance,
     source,
     message,
-    contextId,
+    hubId,
   });
 
   return {
@@ -87,7 +87,7 @@ export async function emitPleasure(
     source,
     message,
     subject,
-    contextId,
+    hubId,
     escalationLevel: 0,
     timestamp: event.timestamp,
     acknowledged: false,
@@ -100,11 +100,11 @@ async function escalatePain(signal: AlgedonicSignal): Promise<void> {
     return;
   }
 
-  if (!signal.contextId) return;
+  if (!signal.hubId) return;
 
-  const parentContexts = await findParentContexts(signal.contextId);
+  const parentHubs = await findParentHubs(signal.hubId);
 
-  if (parentContexts.length === 0) {
+  if (parentHubs.length === 0) {
     console.log(`[Algedonic] Pain reached root: ${signal.message}`);
 
     const { isConnected, getNetworkChain, getNetworkState } = await import('./network/connection.js');
@@ -123,28 +123,28 @@ async function escalatePain(signal: AlgedonicSignal): Promise<void> {
     return;
   }
 
-  for (const parentId of parentContexts) {
+  for (const parentId of parentHubs) {
     console.log(`[Algedonic] Escalating pain to ${parentId}: ${signal.message}`);
 
     await getChain().append('algedonic:pain', 'escalation', signal.subject, {
       severity: signal.severity,
       source: signal.source,
-      message: `[ESCALATED from ${signal.contextId}] ${signal.message}`,
-      contextId: parentId,
-      originContextId: signal.originContextId,
+      message: `[ESCALATED from ${signal.hubId}] ${signal.message}`,
+      hubId: parentId,
+      originHubId: signal.originHubId,
       escalationLevel: signal.escalationLevel + 1,
     });
   }
 }
 
-async function findParentContexts(contextId: string): Promise<string[]> {
+async function findParentHubs(hubId: string): Promise<string[]> {
   const events = await getChain().recall({});
   const parents: string[] = [];
 
   for (const event of events) {
-    if (event.type === 'membership:joined' && event.subject === contextId) {
-      const p = event.payload as { context: string };
-      parents.push(p.context);
+    if (event.type === 'membership:joined' && event.subject === hubId) {
+      const p = event.payload as { hub: string };
+      parents.push(p.hub);
     }
   }
 
@@ -160,7 +160,7 @@ export async function acknowledgePain(
   });
 }
 
-export async function getPendingSignals(contextId?: string): Promise<AlgedonicSignal[]> {
+export async function getPendingSignals(hubId?: string): Promise<AlgedonicSignal[]> {
   const events = await getChain().recall({});
 
   const painEvents = events.filter(e => e.type === 'algedonic:pain');
@@ -177,12 +177,12 @@ export async function getPendingSignals(contextId?: string): Promise<AlgedonicSi
       severity: 1 | 2 | 3;
       source: string;
       message: string;
-      contextId?: string;
-      originContextId?: string;
+      hubId?: string;
+      originHubId?: string;
       escalationLevel?: number;
     };
 
-    if (contextId && p.contextId !== contextId) continue;
+    if (hubId && p.hubId !== hubId) continue;
 
     signals.push({
       id: event.id,
@@ -191,8 +191,8 @@ export async function getPendingSignals(contextId?: string): Promise<AlgedonicSi
       source: p.source,
       message: p.message,
       subject: event.subject,
-      contextId: p.contextId,
-      originContextId: p.originContextId,
+      hubId: p.hubId,
+      originHubId: p.originHubId,
       escalationLevel: p.escalationLevel || 0,
       timestamp: event.timestamp,
       acknowledged: false,
@@ -202,7 +202,7 @@ export async function getPendingSignals(contextId?: string): Promise<AlgedonicSi
   return signals.sort((a, b) => b.severity - a.severity || b.timestamp - a.timestamp);
 }
 
-export async function getAllSignals(contextId?: string): Promise<AlgedonicSignal[]> {
+export async function getAllSignals(hubId?: string): Promise<AlgedonicSignal[]> {
   const events = await getChain().recall({});
 
   const painEvents = events.filter(e => e.type === 'algedonic:pain');
@@ -223,12 +223,12 @@ export async function getAllSignals(contextId?: string): Promise<AlgedonicSignal
       significance?: number;
       source: string;
       message: string;
-      contextId?: string;
-      originContextId?: string;
+      hubId?: string;
+      originHubId?: string;
       escalationLevel?: number;
     };
 
-    if (contextId && p.contextId !== contextId) continue;
+    if (hubId && p.hubId !== hubId) continue;
 
     const ack = ackMap.get(event.id);
 
@@ -239,8 +239,8 @@ export async function getAllSignals(contextId?: string): Promise<AlgedonicSignal
       source: p.source,
       message: p.message,
       subject: event.subject,
-      contextId: p.contextId,
-      originContextId: p.originContextId,
+      hubId: p.hubId,
+      originHubId: p.originHubId,
       escalationLevel: p.escalationLevel || 0,
       timestamp: event.timestamp,
       acknowledged: !!ack,

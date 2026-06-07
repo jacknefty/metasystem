@@ -11,13 +11,17 @@ import { getDataDir } from './paths.js';
 export interface ScopedPaths {
   root: () => string;
   identity: () => string;
-  operation: () => string;
+  operations: () => string;
   coordination: () => string;
   control: () => string;
   intelligence: () => string;
+  audit: () => string;
+  bridge: () => string;
   chain: () => string;
-  contexts: () => string;
-  context: (id: string) => ScopedPaths;
+  hubs: () => string;
+  hub: (id: string) => ScopedPaths;
+  epics: () => string;
+  epic: (id: string) => ScopedPaths;
   stories: () => string;
   story: (id: string) => ScopedPaths;
   tasks: () => string;
@@ -30,13 +34,17 @@ export function at(basePath: string): ScopedPaths {
   return {
     root: () => basePath,
     identity: () => join(basePath, 'identity.md'),
-    operation: () => join(basePath, 'operation'),
+    operations: () => join(basePath, 'operations'),
     coordination: () => join(basePath, 'coordination'),
     control: () => join(basePath, 'control'),
     intelligence: () => join(basePath, 'intelligence'),
+    audit: () => join(basePath, 'audit'),
+    bridge: () => join(basePath, 'bridge'),
     chain: () => join(basePath, 'chain.jsonl'),
-    contexts: () => join(basePath, 'contexts'),
-    context: (id) => at(join(basePath, 'contexts', id)),
+    hubs: () => join(basePath, 'hubs'),
+    hub: (id) => at(join(basePath, 'hubs', id)),
+    epics: () => join(basePath, 'epics'),
+    epic: (id) => at(join(basePath, 'epics', id)),
     stories: () => join(basePath, 'stories'),
     story: (id) => at(join(basePath, 'stories', id)),
     tasks: () => join(basePath, 'tasks'),

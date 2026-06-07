@@ -23,11 +23,11 @@ export interface AssessmentResult {
 
 export async function selfAssess(workId: string): Promise<AssessmentResult> {
   const work = await getWork(workId);
-  if (!work || !work.contextPath) {
+  if (!work || !work.hubPath) {
     return { workId, passed: true, checkedVerifiers: 0, failures: [] };
   }
 
-  const classification = await classifyContext(work.contextPath);
+  const classification = await classifyContext(work.hubPath);
   if (!classification) {
     return { workId, passed: true, checkedVerifiers: 0, failures: [] };
   }
@@ -45,9 +45,9 @@ export async function selfAssess(workId: string): Promise<AssessmentResult> {
 
   const context: VerifyContext = {
     workId,
-    contextId: work.contextId,
+    hubId: work.hubId,
     branch: 'main',
-    workingDir: work.contextPath,
+    workingDir: work.hubPath,
     changedFiles: [],
   };
 
@@ -80,7 +80,7 @@ export async function selfAssess(workId: string): Promise<AssessmentResult> {
   if (failures.length > 0) {
     for (const failure of failures) {
       await recordPainSignal(
-        work.contextId,
+        work.hubId,
         workId,
         `Post-merge check failed: ${failure.evidence}`,
         failure.verifier
@@ -92,7 +92,7 @@ export async function selfAssess(workId: string): Promise<AssessmentResult> {
       workId,
       `Post-merge check found ${failures.length} issue(s): ${failures.map(f => f.verifier).join(', ')}`,
       2,
-      work.contextId
+      work.hubId
     );
 
     console.log(`[Assessment] ${workId} failed ${failures.length} post-merge checks:`);

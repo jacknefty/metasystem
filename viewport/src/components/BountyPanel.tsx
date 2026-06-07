@@ -25,7 +25,7 @@ import {
 interface BountyPanelProps {
   nodeId: string;
   isRoot: boolean;
-  memberships: Array<{ context: string; role?: string }>;
+  memberships: Array<{ hub: string; role?: string }>;
 }
 
 export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
@@ -60,7 +60,7 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
       setPostedBounties(posted);
 
       // Available bounties: work from contexts we're members of (excluding our own)
-      const memberContexts = memberships.map(m => m.context);
+      const memberContexts = memberships.map(m => m.hub);
       const available = pool.filter(b =>
         memberContexts.includes(b.projectId) &&
         b.projectId !== nodeId &&

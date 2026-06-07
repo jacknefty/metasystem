@@ -30,7 +30,7 @@ export type { NodeSettings };
 export { DEFAULT_SETTINGS };
 
 export interface DerivedMembership {
-  context: string;
+  hub: string;
   role?: string;
   joinedAt: number;
 }
@@ -66,8 +66,8 @@ export interface Claim {
 export interface DerivedWork {
   id: string;
   name: string;
-  contextId: string;
-  contextPath?: string;  // optional - can be resolved from context node at execution time
+  hubId: string;
+  hubPath?: string;  // optional - can be resolved from hub node at execution time
   daoAddress?: string;   // DAO scope identifier for variety accounting
   ownerId: string;
   status: WorkStatus;
@@ -164,7 +164,7 @@ export function deriveNode(events: ChainEvent[]): DerivedNode | null {
         const p = event.payload as EventPayloads['membership:joined'];
         if (event.subject === node.id) {
           node.memberships.push({
-            context: p.context,
+            hub: p.hub,
             role: p.role,
             joinedAt: event.timestamp,
           });
@@ -177,7 +177,7 @@ export function deriveNode(events: ChainEvent[]): DerivedNode | null {
         if (!node) break;
         const p = event.payload as EventPayloads['membership:left'];
         if (event.subject === node.id) {
-          node.memberships = node.memberships.filter(m => m.context !== p.context);
+          node.memberships = node.memberships.filter(m => m.hub !== p.hub);
           node.updatedAt = event.timestamp;
         }
         break;
@@ -210,8 +210,8 @@ export function deriveWork(events: ChainEvent[]): DerivedWork | null {
         work = {
           id: event.subject,
           name: p.name,
-          contextId: p.contextId,
-          contextPath: p.contextPath,
+          hubId: p.hubId,
+          hubPath: p.hubPath,
           daoAddress: p.daoAddress,
           ownerId: event.emitter,
           status: p.dependsOn?.length ? 'blocked' : 'active',

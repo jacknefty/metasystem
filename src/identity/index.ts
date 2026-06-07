@@ -17,14 +17,46 @@ export {
   type DerivedNode,
 } from './node.js';
 
-// Context management
+// Hub management (project/DAO containers)
 export {
-  createContext,
-  listContexts,
-  getContext,
-  closeContext,
-  type CreateContextInput,
-} from './context.js';
+  createHub,
+  listHubs,
+  getHub,
+  closeHub,
+  type CreateHubInput,
+} from './hub.js';
+
+// Epic (major outcome grouping)
+export {
+  createEpic,
+  completeEpic,
+  type CreateEpicInput,
+} from './epic.js';
+
+// Story (bounty level - contract boundary)
+export {
+  createStory,
+  postStoryBounty,
+  claimStory,
+  submitStory,
+  verifyStory,
+  completeStory,
+  type CreateStoryInput,
+} from './story.js';
+
+// Task (agent's internal decomposition)
+export {
+  createTask,
+  completeTask,
+  type CreateTaskInput,
+} from './task.js';
+
+// Scaffold (VSM folder generator)
+export {
+  scaffoldScope,
+  type ScopeType,
+  type ScaffoldOptions,
+} from './scaffold.js';
 
 // Settings
 export {

@@ -8,8 +8,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
-import { getChain } from '../coordination/channels/chain.js';
-import { paths } from '../identity/paths.js';
+import { getChain } from '../channels/chain.js';
+import { paths } from '../../identity/paths.js';
 
 // =============================================================================
 // Types
@@ -35,7 +35,7 @@ export interface DAORegistration {
   evmAddress?: `0x${string}`;     // Ethereum address (Safe, governance contract, etc.)
 
   // Location (one of these)
-  contextPath?: string;           // /Users/lionsmane/Desktop/MetaSystem
+  hubPath?: string;               // /Users/lionsmane/Desktop/MetaSystem
   gitRemote?: string;             // git@github.com:org/repo.git
 
   // Resolved at runtime
@@ -108,7 +108,7 @@ export async function registerDAO(dao: Omit<DAORegistration, 'registeredAt'>): P
   await getChain().append('dao:registered', 'registry', dao.address, {
     address: dao.address,
     name: dao.name,
-    contextPath: dao.contextPath,
+    hubPath: dao.hubPath,
     gitRemote: dao.gitRemote,
   });
 
@@ -117,7 +117,7 @@ export async function registerDAO(dao: Omit<DAORegistration, 'registeredAt'>): P
 
 export async function updateDAO(
   address: DAOAddress,
-  updates: Partial<Pick<DAORegistration, 'name' | 'identity' | 'contextPath' | 'gitRemote'>>
+  updates: Partial<Pick<DAORegistration, 'name' | 'identity' | 'hubPath' | 'gitRemote'>>
 ): Promise<DAORegistration> {
   const existing = registry.get(address);
   if (!existing) {
@@ -172,9 +172,9 @@ export function getDefaultDAO(): DAORegistration | null {
 // Path Resolution
 // =============================================================================
 
-function resolvePath(dao: Pick<DAORegistration, 'contextPath' | 'gitRemote'>): string | undefined {
-  if (dao.contextPath) {
-    return dao.contextPath;
+function resolvePath(dao: Pick<DAORegistration, 'hubPath' | 'gitRemote'>): string | undefined {
+  if (dao.hubPath) {
+    return dao.hubPath;
   }
 
   if (dao.gitRemote) {
@@ -210,15 +210,15 @@ export function isMetaSystemRegistered(): boolean {
   return registry.has(METASYSTEM_ADDRESS);
 }
 
-export async function registerMetaSystem(contextPath?: string): Promise<DAORegistration> {
-  const path = contextPath ?? process.cwd();
+export async function registerMetaSystem(hubPath?: string): Promise<DAORegistration> {
+  const path = hubPath ?? process.cwd();
 
   // Check if already registered
   const existing = registry.get(METASYSTEM_ADDRESS);
   if (existing) {
     // Update path if different
-    if (existing.contextPath !== path) {
-      return updateDAO(METASYSTEM_ADDRESS, { contextPath: path });
+    if (existing.hubPath !== path) {
+      return updateDAO(METASYSTEM_ADDRESS, { hubPath: path });
     }
     return existing;
   }
@@ -226,7 +226,7 @@ export async function registerMetaSystem(contextPath?: string): Promise<DAORegis
   return registerDAO({
     address: METASYSTEM_ADDRESS,
     name: 'MetaSystem',
-    contextPath: path,
+    hubPath: path,
     identity: {
       purpose: 'Build the viable system infrastructure',
       scope: ['**'],

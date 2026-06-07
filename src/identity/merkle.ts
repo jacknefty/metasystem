@@ -54,9 +54,9 @@ export function collectAllIdentities(): MerkleLeaf[] {
   }
 
   // Context identities
-  const contextsDir = paths.contexts();
-  if (existsSync(contextsDir)) {
-    for (const dirName of readdirSync(contextsDir)) {
+  const hubsDir = paths.hubs();
+  if (existsSync(hubsDir)) {
+    for (const dirName of readdirSync(hubsDir)) {
       const id = dirName.startsWith('ctx_') ? dirName : `ctx_${dirName}`;
       const identity = loadIdentity(id);
       if (identity) {

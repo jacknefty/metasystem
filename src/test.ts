@@ -4,7 +4,7 @@
 
 import { LocalChain, setChain } from './coordination/channels/chain.js';
 import { deriveNode, deriveWork, deriveAllNodes, deriveAllWork } from './coordination/resources/derive.js';
-import { joinContext, leaveContext, getMembers, getMemberships, isMember } from './coordination/resources/membership.js';
+import { joinHub, leaveHub, getMembers, getMemberships, isMember } from './coordination/resources/membership.js';
 import { createWork, postBounty, claimWork, submitWork, completeWork, getWork, listWork, listAvailableWork } from './coordination/resources/work.js';
 import { emitPerceived, emitResolved, getBalance, getDiagnosis } from './coordination/resources/variety.js';
 import { emitVariety, getResolution, mintCredit, getPendingCredits, getSystemBalance, bitsToAmount } from './coordination/resources/token.js';
@@ -12,7 +12,7 @@ import { createNode, getNode, listNodes, updateSettings } from './identity/node.
 import { getBountyPool, getPoolStats, checkClaimability, getReputation } from './coordination/resources/pool.js';
 import { runDynamicsControlTick } from './control/balance/homeostat.js';
 import { dynamicsHomeostat, clearFreeEnergyCache } from './control/dynamics/index.js';
-import { executeWork, finalizeWork } from './operation/execute.js';
+import { executeWork, finalizeWork } from './operations/execute.js';
 import { join } from 'path';
 import { unlinkSync, existsSync } from 'fs';
 
@@ -49,8 +49,8 @@ async function testChain() {
   // 2. Append work:created
   await chain.append('work:created', 'node-1', 'work-1', {
     name: 'Test Work',
-    contextId: 'node-1',
-    contextPath: '/tmp/test-project',
+    hubId: 'node-1',
+    hubPath: '/tmp/test-project',
     conditions: [
       { id: 'c1', description: 'File exists', verifier: 'exists:test.txt' },
     ],
@@ -103,15 +103,15 @@ async function testDerivation() {
 
   // Join a project
   await chain.append('membership:joined', 'system', 'node-1', {
-    context: 'project-1',
+    hub: 'project-1',
     role: 'worker',
   });
 
   // Create work
   await chain.append('work:created', 'node-1', 'work-1', {
     name: 'Implement feature',
-    contextId: 'project-1',
-    contextPath: '/tmp/test-project',
+    hubId: 'project-1',
+    hubPath: '/tmp/test-project',
     conditions: [
       { id: 'c1', description: 'Tests pass', verifier: 'passes:npm test' },
       { id: 'c2', description: 'File exists', verifier: 'exists:feature.ts' },
@@ -204,7 +204,7 @@ async function testMembership() {
   });
 
   // Worker joins project
-  await joinContext('worker-1', 'project-1', 'developer');
+  await joinHub('worker-1', 'project-1', 'developer');
   console.log('1. Worker joined project');
 
   // Check membership
@@ -220,7 +220,7 @@ async function testMembership() {
   console.log('4. Worker memberships:', memberships.length);
 
   // Leave project
-  await leaveContext('worker-1', 'project-1');
+  await leaveHub('worker-1', 'project-1');
   const isAfter = await isMember('worker-1', 'project-1');
   console.log('5. After leave, isMember:', isAfter);
 
@@ -250,8 +250,8 @@ async function testWorkLifecycle() {
   // Create work
   const workId = await createWork({
     name: 'Build feature',
-    contextId: 'project-1',
-    contextPath: '/tmp/test-project',
+    hubId: 'project-1',
+    hubPath: '/tmp/test-project',
     ownerId: 'project-1',
     conditions: [
       { id: 'c1', description: 'Tests pass', verifier: 'passes:npm test', varietyWeight: 20 },
@@ -326,14 +326,14 @@ async function testTokenAndCredits() {
   const chain = setupTestChain();
 
   // Create work with conditions
-  const contextId = await createNode({ name: 'Project', purpose: 'Test' });
+  const hubId = await createNode({ name: 'Project', purpose: 'Test' });
   const nodeId = await createNode({ name: 'Worker', purpose: 'Work' });
 
   const workId = await createWork({
     name: 'Feature',
-    contextId,
-    contextPath: '/tmp/test-project',
-    ownerId: contextId,
+    hubId,
+    hubPath: '/tmp/test-project',
+    ownerId: hubId,
     conditions: [
       { id: 'c1', description: 'Tests pass', verifier: 'llm', varietyWeight: 25 },
       { id: 'c2', description: 'Code reviewed', verifier: 'llm', varietyWeight: 15 },
@@ -343,7 +343,7 @@ async function testTokenAndCredits() {
   console.log('1. Created work with 40 bits total weight');
 
   // Emit variety for work creation
-  await emitVariety('env', 'in', contextId, workId, 40, { workId, context: 'work created' });
+  await emitVariety('env', 'in', hubId, workId, 40, { workId, context: 'work created' });
 
   // Check resolution before completion
   let resolution = await getResolution(workId);
@@ -427,16 +427,16 @@ async function testCoordination() {
   const chain = setupTestChain();
 
   // Create project and worker
-  const contextId = await createNode({ name: 'Project', purpose: 'A project' });
+  const hubId = await createNode({ name: 'Project', purpose: 'A project' });
   const nodeId = await createNode({ name: 'Worker', purpose: 'Do work' });
   await updateSettings(nodeId, { availableForWork: true });
 
   // Create and post work
   const workId = await createWork({
     name: 'Build feature',
-    contextId,
-    contextPath: '/tmp/test-project',
-    ownerId: contextId,
+    hubId,
+    hubPath: '/tmp/test-project',
+    ownerId: hubId,
     conditions: [{ id: 'c1', description: 'Done', verifier: 'llm', varietyWeight: 25 }],
   });
   await postBounty(workId, 25);
@@ -466,16 +466,16 @@ async function testControlLoop() {
   setupTestChain();
 
   // Create project and worker
-  const contextId = await createNode({ name: 'Project', purpose: 'A project' });
+  const hubId = await createNode({ name: 'Project', purpose: 'A project' });
   const nodeId = await createNode({ name: 'Worker', purpose: 'Do work' });
   await updateSettings(nodeId, { availableForWork: true });
 
   // Create work — postBounty emits variety:env:in automatically
   const workId = await createWork({
     name: 'Task',
-    contextId,
-    contextPath: '/tmp/test-project',
-    ownerId: contextId,
+    hubId,
+    hubPath: '/tmp/test-project',
+    ownerId: hubId,
     conditions: [{ id: 'c1', description: 'Done', verifier: 'llm', varietyWeight: 10 }],
   });
   await postBounty(workId, 10);

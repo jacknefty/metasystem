@@ -16,8 +16,8 @@ export interface NodeAuditResult {
   driftDetails?: string;
 }
 
-export interface ContextAuditResult {
-  contextId: string;
+export interface HubAuditResult {
+  hubId: string;
   nodeId: string;
   workId: string;
   timestamp: number;
@@ -29,11 +29,11 @@ export interface ContextAuditResult {
 
 export interface DaoAuditResult {
   daoId: string;
-  contextId: string;
+  hubId: string;
   nodeId: string;
   workId: string;
   timestamp: number;
-  contextAudit: ContextAuditResult;
+  hubAudit: HubAuditResult;
   ourVerification: VerificationResult;
   drift: boolean;
 }

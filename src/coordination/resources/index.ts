@@ -29,8 +29,8 @@ export {
 
 // Membership
 export {
-  joinContext,
-  leaveContext,
+  joinHub,
+  leaveHub,
   getMembers,
   getMemberships,
   isMember,

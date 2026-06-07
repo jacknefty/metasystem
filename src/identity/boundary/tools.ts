@@ -5,7 +5,7 @@
  * If any ancestor denies a capability, it's denied.
  */
 
-import type { ToolSpec } from '../../tools/types.js';
+import type { ToolSpec } from '../../operations/tools/types.js';
 import { getNode, type DerivedNode } from '../node.js';
 
 export interface ToolAccessDecision {
@@ -29,7 +29,7 @@ async function getAncestry(nodeId: string): Promise<DerivedNode[]> {
     ancestry.push(node);
 
     if (node.memberships.length > 0) {
-      currentId = node.memberships[0].context;
+      currentId = node.memberships[0].hub;
     } else {
       break;
     }

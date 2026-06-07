@@ -58,7 +58,7 @@ export function bootstrap(): void {
     paths.root(),
     paths.identity(),
     paths.nodes(),
-    paths.contexts(),
+    paths.hubs(),
     paths.worktrees(),
     paths.cache(),
     paths.extensions.root(),

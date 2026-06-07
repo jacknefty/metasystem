@@ -11,9 +11,9 @@
 import { createHash } from 'crypto';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getChain } from '../coordination/channels/chain.js';
-import { getMerkleRoot, getMerkleProof, getCredit, markCreditsMinted } from '../control/dynamics/bridge.js';
-import { paths } from '../identity/paths.js';
+import { getChain } from '../channels/chain.js';
+import { getMerkleRoot, getMerkleProof, getCredit, markCreditsMinted } from '../../control/dynamics/bridge.js';
+import { paths } from '../../identity/paths.js';
 
 // =============================================================================
 // Configuration
@@ -202,7 +202,7 @@ export async function prepareRootCommit(chainId?: string): Promise<{
     throw new Error('No merkle root available');
   }
 
-  const { getPendingCredits } = await import('../control/dynamics/bridge.js');
+  const { getPendingCredits } = await import('../../control/dynamics/bridge.js');
   const pending = getPendingCredits();
   const pendingAmount = pending.reduce((sum, c) => sum + c.amount, 0n);
 

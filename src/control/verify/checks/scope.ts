@@ -27,7 +27,7 @@ export async function checkScopeCompliance(
   const declaredScope = identity?.scope ?? node?.scope ?? ['**'];
   if (declaredScope.includes('**')) return null;
 
-  const touchedFiles = await getTouchedFiles(workId, work.contextPath);
+  const touchedFiles = await getTouchedFiles(workId, work.hubPath);
   if (touchedFiles.length === 0) return null;
 
   const violations = touchedFiles.filter(f => !checkFileInScope(f, declaredScope).allowed);
@@ -42,7 +42,7 @@ export async function checkScopeCompliance(
   return null;
 }
 
-async function getTouchedFiles(workId: string, contextPath?: string): Promise<string[]> {
+async function getTouchedFiles(workId: string, hubPath?: string): Promise<string[]> {
   const events = await getChain().recall({ subject: workId, type: 'work:submitted' });
   if (events.length === 0) return [];
 
@@ -52,7 +52,7 @@ async function getTouchedFiles(workId: string, contextPath?: string): Promise<st
 
   if (!branch) return [];
 
-  const cwd = contextPath ?? process.cwd();
+  const cwd = hubPath ?? process.cwd();
 
   try {
     const output = execSync(`git diff --name-only main...${branch}`, {

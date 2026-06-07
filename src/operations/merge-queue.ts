@@ -4,8 +4,8 @@
  * Verified work items queue for merge. Process serially per project.
  */
 
-import { mergeBranch, hasConflicts, getConflictFiles, abortMerge, checkoutBranch, getDefaultBranch } from '../operation/git.js';
-import { removeWorktree } from '../operation/worktree.js';
+import { mergeBranch, hasConflicts, getConflictFiles, abortMerge, checkoutBranch, getDefaultBranch } from '../operations/git.js';
+import { removeWorktree } from '../operations/worktree.js';
 import { getChain } from '../coordination/channels/chain.js';
 import { listWork } from '../coordination/resources/work.js';
 import { releaseScope } from '../coordination/dampen/locks.js';
@@ -13,8 +13,8 @@ import { getNode } from '../identity/node.js';
 
 export interface MergeQueueItem {
   workId: string;
-  contextId: string;
-  contextPath?: string;
+  hubId: string;
+  hubPath?: string;
   branch: string;
   addedAt: number;
 }
@@ -23,42 +23,42 @@ const queues = new Map<string, MergeQueueItem[]>();
 const processing = new Set<string>();
 
 export function addToMergeQueue(item: MergeQueueItem): void {
-  const queue = queues.get(item.contextId) || [];
+  const queue = queues.get(item.hubId) || [];
 
   if (queue.some(q => q.workId === item.workId)) {
     return;
   }
 
   queue.push(item);
-  queues.set(item.contextId, queue);
+  queues.set(item.hubId, queue);
 }
 
-export function getMergeQueueStatus(contextId: string): {
+export function getMergeQueueStatus(hubId: string): {
   pending: number;
   processing: boolean;
 } {
-  const queue = queues.get(contextId) || [];
+  const queue = queues.get(hubId) || [];
   return {
     pending: queue.length,
-    processing: processing.has(contextId),
+    processing: processing.has(hubId),
   };
 }
 
-export function getMergeQueue(contextId: string): MergeQueueItem[] {
-  return queues.get(contextId) || [];
+export function getMergeQueue(hubId: string): MergeQueueItem[] {
+  return queues.get(hubId) || [];
 }
 
-export async function processMergeQueue(contextId: string): Promise<void> {
-  if (processing.has(contextId)) {
+export async function processMergeQueue(hubId: string): Promise<void> {
+  if (processing.has(hubId)) {
     return;
   }
 
-  const queue = queues.get(contextId);
+  const queue = queues.get(hubId);
   if (!queue || queue.length === 0) {
     return;
   }
 
-  processing.add(contextId);
+  processing.add(hubId);
 
   try {
     while (queue.length > 0) {
@@ -72,7 +72,7 @@ export async function processMergeQueue(contextId: string): Promise<void> {
       }
     }
   } finally {
-    processing.delete(contextId);
+    processing.delete(hubId);
   }
 }
 
@@ -80,33 +80,33 @@ async function mergeItem(item: MergeQueueItem): Promise<boolean> {
   const chain = getChain();
 
   // Resolve context path - try item first, then fall back to context node
-  let contextPath = item.contextPath;
-  if (!contextPath) {
-    const context = await getNode(item.contextId);
-    contextPath = context?.settings?.path as string | undefined;
+  let hubPath = item.hubPath;
+  if (!hubPath) {
+    const context = await getNode(item.hubId);
+    hubPath = context?.settings?.path as string | undefined;
   }
 
-  if (!contextPath) {
+  if (!hubPath) {
     await chain.append('algedonic:pain', 'merge-queue', item.workId, {
       severity: 3,
       source: 'no-context-path',
       message: 'Cannot merge - no context path available',
-      contextId: item.contextId,
+      hubId: item.hubId,
     });
     return false;
   }
 
-  const defaultBranch = await getDefaultBranch(contextPath);
-  await checkoutBranch(defaultBranch, contextPath);
+  const defaultBranch = await getDefaultBranch(hubPath);
+  await checkoutBranch(defaultBranch, hubPath);
 
-  const result = await mergeBranch(item.branch, contextPath, `Merge work: ${item.workId}`);
+  const result = await mergeBranch(item.branch, hubPath, `Merge work: ${item.workId}`);
 
   if (!result.success) {
-    if (await hasConflicts(contextPath)) {
-      const conflictFiles = await getConflictFiles(contextPath);
+    if (await hasConflicts(hubPath)) {
+      const conflictFiles = await getConflictFiles(hubPath);
 
       console.log(`[MergeQueue] Conflict in ${item.branch}, dispatching resolver...`);
-      const resolved = await dispatchConflictResolver(item, conflictFiles, contextPath);
+      const resolved = await dispatchConflictResolver(item, conflictFiles, hubPath);
 
       if (resolved) {
         await removeWorktree(item.workId);
@@ -126,11 +126,11 @@ async function mergeItem(item: MergeQueueItem): Promise<boolean> {
         severity: 2,
         source: 'merge-conflict',
         message: `Merge conflict in ${conflictFiles.join(', ')} (agent could not resolve)`,
-        contextId: item.contextId,
+        hubId: item.hubId,
         requiresAttestation: true,
       });
 
-      await abortMerge(contextPath);
+      await abortMerge(hubPath);
       return false;
     }
 
@@ -138,7 +138,7 @@ async function mergeItem(item: MergeQueueItem): Promise<boolean> {
       severity: 2,
       source: 'merge-failed',
       message: result.error || 'Merge failed',
-      contextId: item.contextId,
+      hubId: item.hubId,
     });
 
     return false;
@@ -159,7 +159,7 @@ async function mergeItem(item: MergeQueueItem): Promise<boolean> {
 async function dispatchConflictResolver(
   item: MergeQueueItem,
   conflictFiles: string[],
-  contextPath: string
+  hubPath: string
 ): Promise<boolean> {
   const { execute } = await import('./executor.js');
   const { readFileSync } = await import('fs');
@@ -168,7 +168,7 @@ async function dispatchConflictResolver(
   const conflictContents: Record<string, string> = {};
   for (const file of conflictFiles) {
     try {
-      const content = readFileSync(join(contextPath, file), 'utf-8');
+      const content = readFileSync(join(hubPath, file), 'utf-8');
       conflictContents[file] = content;
     } catch {
       // Skip unreadable files
@@ -178,7 +178,7 @@ async function dispatchConflictResolver(
   const prompt = buildConflictResolverPrompt(item.workId, conflictFiles, conflictContents);
 
   const result = await execute(prompt, 'claude', {
-    workingDir: contextPath,
+    workingDir: hubPath,
     autonomous: true,
     timeout: 120000,
   });
@@ -188,14 +188,14 @@ async function dispatchConflictResolver(
     return false;
   }
 
-  if (await hasConflicts(contextPath)) {
+  if (await hasConflicts(hubPath)) {
     console.log(`[MergeQueue] Conflicts still present after resolver`);
     return false;
   }
 
   const { addAll, commit } = await import('./git.js');
-  await addAll(contextPath);
-  const commitResult = await commit(`Resolve merge conflict: ${item.workId}`, contextPath);
+  await addAll(hubPath);
+  const commitResult = await commit(`Resolve merge conflict: ${item.workId}`, hubPath);
 
   return commitResult.success;
 }
@@ -246,19 +246,19 @@ export async function rebuildMergeQueue(): Promise<void> {
     if (work.bountyStatus === 'verified' && work.status !== 'fulfilled') {
       addToMergeQueue({
         workId: work.id,
-        contextId: work.contextId,
-        contextPath: work.contextPath,
+        hubId: work.hubId,
+        hubPath: work.hubPath,
         branch: work.submission?.branch ?? `work/${work.id}`,
         addedAt: work.updatedAt,
       });
     }
   }
 
-  const contextIds = new Set(allWork.map(w => w.contextId));
-  for (const contextId of contextIds) {
-    const queue = queues.get(contextId);
+  const hubIds = new Set(allWork.map(w => w.hubId));
+  for (const hubId of hubIds) {
+    const queue = queues.get(hubId);
     if (queue && queue.length > 0) {
-      processMergeQueue(contextId);
+      processMergeQueue(hubId);
     }
   }
 }

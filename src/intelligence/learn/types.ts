@@ -5,7 +5,7 @@
 export interface LearningRecord {
   workId: string;
   nodeId: string;
-  contextId: string;
+  hubId: string;
   outcome: 'success' | 'failure' | 'partial';
   conditions: ConditionOutcome[];
   executorUsed: string;

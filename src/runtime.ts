@@ -8,20 +8,20 @@ import { getChain } from './coordination/channels/chain.js';
 import { getWork, postBounty } from './coordination/resources/work.js';
 import { runDynamicsControlTick } from './control/balance/homeostat.js';
 import { runVerification } from './control/verify/runner.js';
-import { executeWork, finalizeWork } from './operation/execute.js';
+import { executeWork, finalizeWork } from './operations/execute.js';
 import { rebuildLocks, clearStaleLocks } from './coordination/dampen/locks.js';
 import { maybeRunHousekeeping, clearStarvationSignal, clearHoardingSignal } from './coordination/dampen/housekeeping.js';
 import { selfAssess } from './audit/assess.js';
 import { evolveAgent } from './control/dynamics/index.js';
-import { addToMergeQueue, processMergeQueue, rebuildMergeQueue } from './operation/merge-queue.js';
+import { addToMergeQueue, processMergeQueue, rebuildMergeQueue } from './operations/merge-queue.js';
 import { recordOutcome } from './intelligence/learn/recorder.js';
-import { registerProvider, refreshTools } from './tools/index.js';
-import { builtinProvider } from './tools/builtin/index.js';
-import { mcpProvider, connectAll as connectMCP } from './tools/mcp/index.js';
-import { loadStats as loadToolStats } from './tools/reliability.js';
-import { runToolAuditPass } from './tools/audit.js';
+import { registerProvider, refreshTools } from './operations/tools/index.js';
+import { builtinProvider } from './operations/tools/builtin/index.js';
+import { mcpProvider, connectAll as connectMCP } from './operations/tools/mcp/index.js';
+import { loadStats as loadToolStats } from './operations/tools/reliability.js';
+import { runToolAuditPass } from './operations/tools/audit.js';
 import { finalizeProposal } from './coordination/governance/index.js';
-import { maybeCommitMerkleRoot } from './bridge/auto-commit.js';
+import { maybeCommitMerkleRoot } from './coordination/bridge/auto-commit.js';
 import { checkIdentityRoot } from './identity/sync.js';
 import type { ChainEvent } from './coordination/channels/events.js';
 
@@ -102,12 +102,12 @@ export function startRuntime(): () => void {
           if (work && work.submission?.branch) {
             addToMergeQueue({
               workId: work.id,
-              contextId: work.contextId,
-              contextPath: work.contextPath,
+              hubId: work.hubId,
+              hubPath: work.hubPath,
               branch: work.submission.branch,
               addedAt: Date.now(),
             });
-            processMergeQueue(work.contextId);
+            processMergeQueue(work.hubId);
           }
         }
       } catch (err) {
@@ -234,14 +234,14 @@ export function startRuntime(): () => void {
         severity: 1 | 2 | 3;
         source: string;
         message: string;
-        contextId?: string;
+        hubId?: string;
       };
 
       console.log(`[Algedonic] Pain signal: severity=${payload.severity} source=${payload.source} message=${payload.message}`);
 
       if (payload.severity >= 2) {
-        if (payload.contextId) {
-          await getChain().append('context:attention', 'algedonic', payload.contextId, {
+        if (payload.hubId) {
+          await getChain().append('hub:attention', 'algedonic', payload.hubId, {
             reason: payload.message,
             source: payload.source,
             severity: payload.severity,

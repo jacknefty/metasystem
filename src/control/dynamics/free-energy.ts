@@ -16,14 +16,20 @@ import { scopeKey, getParentScope, DEFAULT_PARAMETERS } from './types.js';
 
 /**
  * Query child scopes from chain events.
- * Children are contexts, stories, tasks, or nodes created under this scope.
+ * Children are hubs, epics, stories, tasks, or nodes created under this scope.
  */
 export async function listChildScopes(scope: Scope): Promise<Scope[]> {
   const scopePath = scope.root();
 
-  // Query creation events
   const events = await getChain().recall({
-    type: ['context:created', 'work:created', 'identity:created'],
+    type: [
+      'hub:created',
+      'epic:created',
+      'story:created',
+      'task:created',
+      'identity:created',
+      'work:created',
+    ],
   });
 
   const children: Scope[] = [];
@@ -33,20 +39,17 @@ export async function listChildScopes(scope: Scope): Promise<Scope[]> {
       scopePath?: string;
       parentPath?: string;
       contextPath?: string;
-      contextId?: string;
+      hubId?: string;
     };
 
-    // Match events that are direct children of this scope
     const eventPath = payload.scopePath || payload.contextPath;
     const parentPath = payload.parentPath;
 
     if (parentPath === scopePath) {
-      // Explicit parent reference
       if (eventPath) {
         children.push(at(eventPath));
       }
     } else if (eventPath && isDirectChild(scopePath, eventPath)) {
-      // Infer from path structure
       children.push(at(eventPath));
     }
   }

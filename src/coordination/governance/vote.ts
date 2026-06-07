@@ -109,13 +109,13 @@ function computeRelevance(proposal: Proposal, voterId: string): number {
 
   for (const membership of memberships) {
     // Direct membership in proposal scope
-    if (membership.context === id) {
+    if (membership.hub === id) {
       overlapCount += 1;
       continue;
     }
 
     // Voter's membership scope contains or is contained by proposal scope
-    const memberPath = `/contexts/${membership.context}`;
+    const memberPath = `/hubs/${membership.hub}`;
     if (isWithin(proposalPath, proposal.scope) || proposalPath.startsWith(memberPath) || memberPath.startsWith(proposalPath)) {
       overlapCount += 0.5; // Partial overlap
     }

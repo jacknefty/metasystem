@@ -5,9 +5,9 @@
  * Credit flow: credit:earned → credit:committed → merkle:committed → [on-chain] → minted
  */
 
-import { getChain } from '../coordination/channels/chain.js';
-import { getPendingCredits as getBridgePendingCredits, getMerkleRoot } from '../control/dynamics/bridge.js';
-import type { EventPayloads } from '../coordination/channels/events.js';
+import { getChain } from '../channels/chain.js';
+import { getPendingCredits as getBridgePendingCredits, getMerkleRoot } from '../../control/dynamics/bridge.js';
+import type { EventPayloads } from '../channels/events.js';
 import { createHash } from 'crypto';
 
 const COMMIT_THRESHOLD = 10;      // Commit when this many credits pending

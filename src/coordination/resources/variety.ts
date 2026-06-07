@@ -12,7 +12,7 @@ export type SystemVarietyBalance = SystemBalance;
 
 export interface VarietyOptions {
   context?: string;      // descriptive label ("work posted", "scan complete")
-  contextId?: string;    // scope identifier for filtering
+  hubId?: string;        // hub scope identifier for filtering
   daoAddress?: string;   // DAO scope identifier
   workId?: string;       // for resolved variety
   scopePath?: string;    // full scope path for recursive F computation
@@ -26,7 +26,7 @@ export async function emitPerceived(
 ): Promise<void> {
   await emitVariety('env', 'in', emitter, subject, bits, {
     context: opts?.context,
-    contextId: opts?.contextId,
+    hubId: opts?.hubId,
     daoAddress: opts?.daoAddress,
     scopePath: opts?.scopePath,
   });
@@ -41,7 +41,7 @@ export async function emitResolved(
   await emitVariety('work', 'out', emitter, subject, bits, {
     workId: opts?.workId,
     context: opts?.context,
-    contextId: opts?.contextId,
+    hubId: opts?.hubId,
     daoAddress: opts?.daoAddress,
     scopePath: opts?.scopePath,
   });

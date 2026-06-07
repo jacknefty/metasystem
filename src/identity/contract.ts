@@ -14,7 +14,7 @@ import { getChain } from '../coordination/channels/chain.js';
 import { parent, scopeKey, type ScopedPaths } from './scoped-paths.js';
 
 export interface Membership {
-  context: string;
+  hub: string;
   role?: string;
   capacity?: number;
   joinedAt?: number;
@@ -80,7 +80,7 @@ export function parseIdentity(content: string): IdentityContract {
 
 export function getIdentityPath(id: string): string {
   if (id.startsWith('dao_')) return paths.daoIdentity();
-  if (id.startsWith('ctx_')) return paths.contextIdentity(id);
+  if (id.startsWith('ctx_')) return paths.hubIdentity(id);
   if (id.startsWith('node_')) return paths.nodeIdentityFile(id);
   throw new Error(`Unknown identity type: ${id}`);
 }
@@ -263,8 +263,8 @@ export function getAncestry(identity: IdentityContract): string[] {
   return ancestry;
 }
 
-export function getMembershipContexts(identity: IdentityContract): string[] {
-  return identity.frontmatter.memberships?.map(m => m.context) ?? [];
+export function getMembershipHubs(identity: IdentityContract): string[] {
+  return identity.frontmatter.memberships?.map(m => m.hub) ?? [];
 }
 
 export function getTotalCapacity(identity: IdentityContract): number {
@@ -277,10 +277,10 @@ export function getTotalCapacity(identity: IdentityContract): number {
 
 export function getAvailableCapacity(
   identity: IdentityContract,
-  contextId: string
+  hubId: string
 ): number {
   const membership = identity.frontmatter.memberships?.find(
-    m => m.context === contextId
+    m => m.hub === hubId
   );
   return membership?.capacity ?? 0;
 }

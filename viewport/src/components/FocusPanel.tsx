@@ -421,16 +421,16 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                 </div>
                 <div className="space-y-1">
                   {identity.memberships.map((m) => {
-                    const project = allProjects.find(p => p.id === m.context);
+                    const project = allProjects.find(p => p.id === m.hub);
                     return (
                       <div
-                        key={m.context}
+                        key={m.hub}
                         className="px-2 py-1.5 rounded text-sm flex items-center justify-between"
                         style={{ background: COLORS.bg.elevated }}
                       >
                         <div className="flex-1 min-w-0">
                           <div style={{ color: COLORS.text.primary }} className="truncate">
-                            {project?.name || m.context}
+                            {project?.name || m.hub}
                           </div>
                           {m.role && (
                             <div className="text-xs" style={{ color: COLORS.text.muted }}>{m.role}</div>
@@ -438,20 +438,20 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                         </div>
                         <button
                           onClick={async () => {
-                            setJoinLoading(m.context);
-                            await leaveNode(nodeId, m.context);
+                            setJoinLoading(m.hub);
+                            await leaveNode(nodeId, m.hub);
                             await loadData();
                             setJoinLoading(null);
                           }}
-                          disabled={joinLoading === m.context}
+                          disabled={joinLoading === m.hub}
                           className="ml-2 px-2 py-0.5 rounded text-xs"
                           style={{
                             background: `${COLORS.status.critical}20`,
                             color: COLORS.status.critical,
-                            opacity: joinLoading === m.context ? 0.5 : 1,
+                            opacity: joinLoading === m.hub ? 0.5 : 1,
                           }}
                         >
-                          {joinLoading === m.context ? '...' : 'Leave'}
+                          {joinLoading === m.hub ? '...' : 'Leave'}
                         </button>
                       </div>
                     );
@@ -462,7 +462,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
 
             {/* Available to Join (projects this node hasn't joined) */}
             {(() => {
-              const memberContexts = new Set(identity.memberships?.map(m => m.context) || []);
+              const memberContexts = new Set(identity.memberships?.map(m => m.hub) || []);
               const availableToJoin = allProjects.filter(p => !memberContexts.has(p.id));
 
               if (availableToJoin.length === 0) return null;

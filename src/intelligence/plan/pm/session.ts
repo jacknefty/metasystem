@@ -18,11 +18,11 @@ function getSessionsDir(): string {
   return dir;
 }
 
-export function createSession(contextId: string): PMSession {
-  console.log(`[PM:Session] Creating session for context ${contextId}`);
+export function createSession(hubId: string): PMSession {
+  console.log(`[PM:Session] Creating session for context ${hubId}`);
   const session: PMSession = {
     id: `pm_${randomUUID()}`,
-    contextId,
+    hubId,
     phase: 'perceiving',
     partialContract: {
       problem: null,
@@ -55,7 +55,7 @@ export function getSession(sessionId: string): PMSession | null {
   }
 }
 
-export function getSessionByContext(contextId: string): PMSession | null {
+export function getSessionByContext(hubId: string): PMSession | null {
   const dir = getSessionsDir();
   if (!existsSync(dir)) return null;
 
@@ -65,7 +65,7 @@ export function getSessionByContext(contextId: string): PMSession | null {
       if (!file.endsWith('.json')) continue;
       try {
         const session = JSON.parse(readFileSync(join(dir, file), 'utf-8'));
-        if (session.contextId === contextId && session.phase !== 'complete') {
+        if (session.hubId === hubId && session.phase !== 'complete') {
           return session;
         }
       } catch {}
@@ -75,7 +75,7 @@ export function getSessionByContext(contextId: string): PMSession | null {
   return null;
 }
 
-export async function listSessions(contextId?: string): Promise<PMSession[]> {
+export async function listSessions(hubId?: string): Promise<PMSession[]> {
   const dir = getSessionsDir();
   const sessions: PMSession[] = [];
 
@@ -87,7 +87,7 @@ export async function listSessions(contextId?: string): Promise<PMSession[]> {
       if (!file.endsWith('.json')) continue;
       try {
         const session = JSON.parse(readFileSync(join(dir, file), 'utf-8'));
-        if (!contextId || session.contextId === contextId) {
+        if (!hubId || session.hubId === hubId) {
           sessions.push(session);
         }
       } catch {}
@@ -97,7 +97,7 @@ export async function listSessions(contextId?: string): Promise<PMSession[]> {
   return sessions;
 }
 
-export function clearSession(contextId: string): boolean {
+export function clearSession(hubId: string): boolean {
   const dir = getSessionsDir();
   if (!existsSync(dir)) return false;
 
@@ -107,9 +107,9 @@ export function clearSession(contextId: string): boolean {
       if (!file.endsWith('.json')) continue;
       try {
         const session = JSON.parse(readFileSync(join(dir, file), 'utf-8'));
-        if (session.contextId === contextId) {
+        if (session.hubId === hubId) {
           unlinkSync(join(dir, file));
-          console.log(`[PM:Session] Cleared session ${session.id} for context ${contextId}`);
+          console.log(`[PM:Session] Cleared session ${session.id} for context ${hubId}`);
           return true;
         }
       } catch {}

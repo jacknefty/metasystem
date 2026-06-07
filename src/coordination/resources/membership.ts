@@ -1,7 +1,7 @@
 /**
- * Membership — Nodes joining and leaving contexts
+ * Membership — Nodes joining and leaving hubs
  *
- * A "context" is just another node that other nodes can be members of.
+ * A "hub" is a project/DAO container that other nodes can be members of.
  * This is how recursion works — projects have members, swarms have members.
  */
 
@@ -15,14 +15,14 @@ export interface MemberInfo {
 }
 
 export interface MembershipInfo {
-  contextId: string;
+  hubId: string;
   role?: string;
   joinedAt: number;
 }
 
-export async function joinContext(
+export async function joinHub(
   nodeId: string,
-  contextId: string,
+  hubId: string,
   role?: string
 ): Promise<void> {
   const chain = getChain();
@@ -32,42 +32,42 @@ export async function joinContext(
   if (!nodes.has(nodeId)) {
     throw new Error(`Node ${nodeId} not found`);
   }
-  if (!nodes.has(contextId)) {
-    throw new Error(`Context ${contextId} not found`);
+  if (!nodes.has(hubId)) {
+    throw new Error(`Hub ${hubId} not found`);
   }
 
-  if (await isMember(nodeId, contextId)) {
-    throw new Error(`${nodeId} is already a member of ${contextId}`);
+  if (await isMember(nodeId, hubId)) {
+    throw new Error(`${nodeId} is already a member of ${hubId}`);
   }
 
   await chain.append('membership:joined', nodeId, nodeId, {
-    context: contextId,
+    hub: hubId,
     role,
   });
 }
 
-export async function leaveContext(
+export async function leaveHub(
   nodeId: string,
-  contextId: string,
+  hubId: string,
   reason?: string
 ): Promise<void> {
-  if (!(await isMember(nodeId, contextId))) {
-    throw new Error(`${nodeId} is not a member of ${contextId}`);
+  if (!(await isMember(nodeId, hubId))) {
+    throw new Error(`${nodeId} is not a member of ${hubId}`);
   }
 
   await getChain().append('membership:left', nodeId, nodeId, {
-    context: contextId,
+    hub: hubId,
     reason,
   });
 }
 
-export async function getMembers(contextId: string): Promise<MemberInfo[]> {
+export async function getMembers(hubId: string): Promise<MemberInfo[]> {
   const events = await getChain().recall({});
   const nodes = deriveAllNodes(events);
   const members: MemberInfo[] = [];
 
   for (const [nodeId, node] of nodes) {
-    const membership = node.memberships.find(m => m.context === contextId);
+    const membership = node.memberships.find(m => m.hub === hubId);
     if (membership) {
       members.push({
         nodeId,
@@ -88,7 +88,7 @@ export async function getMemberships(nodeId: string): Promise<MembershipInfo[]> 
   if (!node) return [];
 
   return node.memberships.map(m => ({
-    contextId: m.context,
+    hubId: m.hub,
     role: m.role,
     joinedAt: m.joinedAt,
   }));
@@ -96,8 +96,8 @@ export async function getMemberships(nodeId: string): Promise<MembershipInfo[]> 
 
 export async function isMember(
   nodeId: string,
-  contextId: string
+  hubId: string
 ): Promise<boolean> {
   const memberships = await getMemberships(nodeId);
-  return memberships.some(m => m.contextId === contextId);
+  return memberships.some(m => m.hubId === hubId);
 }

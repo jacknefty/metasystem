@@ -137,7 +137,7 @@ export async function mintOnCompletion(
   // Refresh network state
   await refreshNetworkState();
 
-  const scope = dao.context(work.contextId).task(workId);
+  const scope = dao.hub(work.hubId).task(workId);
 
   // Compute ΔF (variety resolved by this work)
   const F_before = work.conditions.reduce((sum, c) => sum + (c.varietyWeight ?? 10), 0);

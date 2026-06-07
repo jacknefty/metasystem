@@ -676,7 +676,7 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
       <AnimatePresence>
         {showCreateModal && rootId && (
           <CreateModal
-            contextId={rootId}
+            hubId={rootId}
             onClose={handleCreateModalClose}
             onCreated={handleCreated}
           />

@@ -265,8 +265,8 @@ function determineStrategy(clusters: WorkCluster[]): ExecutionStrategy {
   return { type: 'phased', phases };
 }
 
-export async function analyzeCoupling(contextId: string): Promise<CouplingAnalysis> {
-  const allWork = await listWork({ contextId });
+export async function analyzeCoupling(hubId: string): Promise<CouplingAnalysis> {
+  const allWork = await listWork({ hubId });
   const activeWork = allWork.filter(w =>
     w.status === 'active' || w.bountyStatus === 'posted' || w.bountyStatus === 'claimed'
   );
@@ -301,8 +301,8 @@ export async function analyzeCoupling(contextId: string): Promise<CouplingAnalys
   };
 }
 
-export async function getNextExecutableWork(contextId: string): Promise<string[]> {
-  const analysis = await analyzeCoupling(contextId);
+export async function getNextExecutableWork(hubId: string): Promise<string[]> {
+  const analysis = await analyzeCoupling(hubId);
 
   if (analysis.strategy.type === 'parallel') {
     return analysis.workIds;
@@ -312,7 +312,7 @@ export async function getNextExecutableWork(contextId: string): Promise<string[]
     return analysis.strategy.order.slice(0, 1);
   }
 
-  const allWork = await listWork({ contextId });
+  const allWork = await listWork({ hubId });
   const completed = new Set(
     allWork.filter(w => w.status === 'fulfilled').map(w => w.id)
   );

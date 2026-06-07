@@ -10,6 +10,8 @@ import { getChain } from '../coordination/channels/chain.js';
 import { deriveAllNodes, deriveNode, type DerivedNode } from '../coordination/resources/derive.js';
 import { DEFAULT_SETTINGS, type NodeSettings } from './settings.js';
 import { paths } from './paths.js';
+import { dao } from './scoped-paths.js';
+import { scaffoldScope } from './scaffold.js';
 
 export { DEFAULT_SETTINGS, type NodeSettings, type DerivedNode };
 
@@ -18,7 +20,7 @@ export interface CreateNodeInput {
   purpose: string;
   scope?: string[];
   settings?: Partial<NodeSettings>;
-  contextId?: string;
+  hubId?: string;
   isRoot?: boolean;
 }
 
@@ -40,6 +42,17 @@ function generateNodeId(): string {
 export async function createNode(input: CreateNodeInput): Promise<string> {
   const chain = getChain();
   const nodeId = generateNodeId();
+  const nodeScope = dao.node(nodeId);
+  const scopePath = nodeScope.root();
+  const parentPath = dao.root();
+
+  scaffoldScope(scopePath, {
+    type: 'node',
+    id: nodeId,
+    name: input.name,
+    purpose: input.purpose,
+    scope: input.scope,
+  });
 
   await chain.append('identity:created', 'system', nodeId, {
     name: input.name,
@@ -51,7 +64,7 @@ export async function createNode(input: CreateNodeInput): Promise<string> {
     await chain.append('identity:settings', 'system', nodeId, input.settings);
   }
 
-  // Create node directory and identity.md
+  // Create additional node-specific files (memory dir, enhanced identity.md)
   ensureNodeDirectory(nodeId, input);
 
   return nodeId;
@@ -80,9 +93,9 @@ function generateIdentityMd(nodeId: string, input: CreateNodeInput): string {
   const autonomyLevel = input.settings?.autonomyLevel ?? 'supervised';
 
   let membershipsYaml = '';
-  if (input.contextId) {
+  if (input.hubId) {
     membershipsYaml = `memberships:
-  - context: ${input.contextId}
+  - hub: ${input.hubId}
     role: contributor
     capacity: 1.0
 `;
@@ -230,11 +243,11 @@ export async function getWorkspaceRoot(): Promise<DerivedNode | null> {
 /**
  * Resolve effective settings for a context.
  */
-export async function resolveContextSettings(contextId: string): Promise<NodeSettings> {
-  const node = await getNode(contextId);
+export async function resolveContextSettings(hubId: string): Promise<NodeSettings> {
+  const node = await getNode(hubId);
 
   if (!node) {
-    console.warn(`[S5] Context ${contextId} not found, using defaults`);
+    console.warn(`[S5] Context ${hubId} not found, using defaults`);
     return { ...DEFAULT_SETTINGS };
   }
 
@@ -245,10 +258,10 @@ export async function resolveContextSettings(contextId: string): Promise<NodeSet
  * Get a single setting for a context.
  */
 export async function getContextSetting<K extends keyof NodeSettings>(
-  contextId: string,
+  hubId: string,
   key: K
 ): Promise<NodeSettings[K]> {
-  const settings = await resolveContextSettings(contextId);
+  const settings = await resolveContextSettings(hubId);
   return settings[key];
 }
 

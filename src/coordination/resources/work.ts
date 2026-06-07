@@ -11,12 +11,12 @@ import { deriveAllWork, deriveWork, deriveAllNodes, type DerivedWork, type WorkS
 import { emitPerceived, emitResolved } from './variety.js';
 import type { Condition } from '../channels/events.js';
 import { resolveContextSettings, checkAutonomy } from '../../identity/node.js';
-import { getDefaultDAO, type DAOAddress } from '../../network/registry.js';
+import { getDefaultDAO, type DAOAddress } from '../network/registry.js';
 
 export interface CreateWorkInput {
   name: string;
-  contextId: string;
-  contextPath?: string;
+  hubId: string;
+  hubPath?: string;
   ownerId: string;
   conditions: Condition[];
   dependsOn?: string[];
@@ -24,7 +24,7 @@ export interface CreateWorkInput {
 }
 
 export interface WorkFilter {
-  contextId?: string;
+  hubId?: string;
   status?: WorkStatus;
   ownerId?: string;
   claimedBy?: string;
@@ -65,12 +65,12 @@ export async function createWork(input: CreateWorkInput): Promise<string> {
   const chain = getChain();
   const workId = generateWorkId();
 
-  let contextPath = input.contextPath;
-  if (!contextPath) {
-    const events = await chain.recall({ subject: input.contextId });
+  let hubPath = input.hubPath;
+  if (!hubPath) {
+    const events = await chain.recall({ subject: input.hubId });
     const nodes = deriveAllNodes(events);
-    const context = nodes.get(input.contextId);
-    contextPath = context?.settings.path;
+    const hub = nodes.get(input.hubId);
+    hubPath = hub?.settings.path;
   }
 
   // Default to first registered DAO
@@ -78,8 +78,8 @@ export async function createWork(input: CreateWorkInput): Promise<string> {
 
   await chain.append('work:created', input.ownerId, workId, {
     name: input.name,
-    contextId: input.contextId,
-    contextPath,
+    hubId: input.hubId,
+    hubPath,
     conditions: input.conditions,
     dependsOn: input.dependsOn,
     daoAddress,
@@ -115,7 +115,7 @@ export async function postBounty(
   const { dao } = await import('../../identity/scoped-paths.js');
   await emitPerceived(work.ownerId, workId, bountyAmount, {
     context: 'work posted',
-    contextId: work.contextId,
+    hubId: work.hubId,
     daoAddress: work.daoAddress,
     scopePath: dao.root(),
   });
@@ -256,7 +256,7 @@ export async function completeWork(workId: string): Promise<void> {
     await emitResolved(nodeId, workId, bountyAmount, {
       workId,
       context: 'work completed',
-      contextId: work.contextId,
+      hubId: work.hubId,
       daoAddress: work.daoAddress,
       scopePath: dao.root(),
     });
@@ -315,8 +315,8 @@ export async function listWork(filter?: WorkFilter): Promise<DerivedWork[]> {
   const allWork = deriveAllWork(events);
   let results = Array.from(allWork.values());
 
-  if (filter?.contextId) {
-    results = results.filter(w => w.contextId === filter.contextId);
+  if (filter?.hubId) {
+    results = results.filter(w => w.hubId === filter.hubId);
   }
   if (filter?.status) {
     results = results.filter(w => w.status === filter.status);
@@ -331,8 +331,8 @@ export async function listWork(filter?: WorkFilter): Promise<DerivedWork[]> {
   return results;
 }
 
-export async function listAvailableWork(contextId?: string): Promise<DerivedWork[]> {
-  const work = await listWork({ contextId });
+export async function listAvailableWork(hubId?: string): Promise<DerivedWork[]> {
+  const work = await listWork({ hubId });
   return work.filter(w =>
     w.bountyStatus === 'posted' &&
     !w.claim &&
@@ -340,8 +340,8 @@ export async function listAvailableWork(contextId?: string): Promise<DerivedWork
   );
 }
 
-export async function getWorkGraph(contextId: string): Promise<WorkGraph & { stats: { pending: number; complete: number; varietyTotal: number; varietyResolved: number; progress: number } }> {
-  const work = await listWork({ contextId });
+export async function getWorkGraph(hubId: string): Promise<WorkGraph & { stats: { pending: number; complete: number; varietyTotal: number; varietyResolved: number; progress: number } }> {
+  const work = await listWork({ hubId });
 
   const dependentCounts = new Map<string, number>();
   const edges: WorkGraphEdge[] = [];

@@ -13,11 +13,11 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { paths } from './identity/paths.js';
 import * as identity from './identity/node.js';
-import { createContext, listContexts } from './identity/context.js';
+import { createHub, listHubs } from './identity/hub.js';
 import { loadIdentity, getIdentityRoot } from './identity/index.js';
 import * as pool from './coordination/resources/pool.js';
 import * as homeostat from './control/balance/homeostat.js';
-import * as operation from './operation/execute.js';
+import * as operation from './operations/execute.js';
 import * as membership from './coordination/resources/membership.js';
 import * as work from './coordination/resources/work.js';
 import * as variety from './coordination/resources/variety.js';
@@ -35,8 +35,8 @@ import { checkFileInScope, filterFilesToScope, expandScope } from './coordinatio
 import { getChain } from './coordination/channels/chain.js';
 import { getBohmianState, getS4Field } from './intelligence/model/bohmian/index.js';
 import { perceiveEnvironment } from './intelligence/perceive/scan.js';
-import * as tools from './tools/index.js';
-import { checkToolHealth } from './tools/reliability.js';
+import * as tools from './operations/tools/index.js';
+import { checkToolHealth } from './operations/tools/reliability.js';
 import { DEFAULT_PARAMETERS, type Scope } from './control/dynamics/types.js';
 import { DEFAULT_QUORUM, DEFAULT_VOTING_PERIOD } from './coordination/governance/types.js';
 import { dao, at } from './identity/scoped-paths.js';
@@ -76,7 +76,7 @@ function serializeScope(scope: Scope): { level: string; id?: string; path: strin
   return { level: 'dao', path };
 }
 
-function parseScope(query: { level?: unknown; id?: unknown; address?: unknown; contextId?: unknown; scopePath?: unknown }): Scope {
+function parseScope(query: { level?: unknown; id?: unknown; address?: unknown; hubId?: unknown; scopePath?: unknown }): Scope {
   // New format: scopePath
   if (query.scopePath) {
     return at(str(query.scopePath));
@@ -86,18 +86,18 @@ function parseScope(query: { level?: unknown; id?: unknown; address?: unknown; c
   const level = str(query.level);
   const id = str(query.id);
   const address = str(query.address);
-  const contextId = str(query.contextId);
+  const hubId = str(query.hubId);
 
   switch (level) {
     case 'dao':
       return dao;
     case 'context':
-      return dao.context(id);
+      return dao.hub(id);
     case 'work':
     case 'task':
-      return dao.context(contextId).task(id);
+      return dao.hub(hubId).task(id);
     case 'story':
-      return dao.context(contextId).story(id);
+      return dao.hub(hubId).story(id);
     case 'node':
       return dao.node(id);
     default:
@@ -216,23 +216,23 @@ app.post('/api/nodes/:id/scope/check', wrap(async (req, res) => {
 }));
 
 // --- Membership ---
-app.post('/api/nodes/:contextId/join', wrap(async (req, res) => {
+app.post('/api/nodes/:hubId/join', wrap(async (req, res) => {
   const nodeId = req.body.nodeId || req.body.memberId;
   if (!nodeId) {
     res.status(400).json({ error: 'nodeId or memberId required' });
     return;
   }
-  await membership.joinContext(nodeId, str(req.params.contextId), req.body.role);
+  await membership.joinHub(nodeId, str(req.params.hubId), req.body.role);
   res.status(201).json({ joined: true });
 }));
 
-app.post('/api/nodes/:contextId/leave', wrap(async (req, res) => {
+app.post('/api/nodes/:hubId/leave', wrap(async (req, res) => {
   const nodeId = req.body.nodeId || req.body.memberId;
   if (!nodeId) {
     res.status(400).json({ error: 'nodeId or memberId required' });
     return;
   }
-  await membership.leaveContext(nodeId, str(req.params.contextId));
+  await membership.leaveHub(nodeId, str(req.params.hubId));
   res.json({ left: true });
 }));
 
@@ -257,7 +257,7 @@ function toFrontendWorkList(works: any[]) {
 
 // --- Work ---
 app.get('/api/work', wrap(async (req, res) => {
-  const filter = req.query.contextId ? { contextId: String(req.query.contextId) } : undefined;
+  const filter = req.query.hubId ? { hubId: String(req.query.hubId) } : undefined;
   res.json(toFrontendWorkList(await work.listWork(filter)));
 }));
 
@@ -265,8 +265,8 @@ app.get('/api/work/active', wrap(async (req, res) => {
   res.json(toFrontendWorkList(await work.listWork({ status: 'active' })));
 }));
 
-app.get('/api/work/graph/:contextId', wrap(async (req, res) => {
-  res.json(await work.getWorkGraph(str(req.params.contextId)));
+app.get('/api/work/graph/:hubId', wrap(async (req, res) => {
+  res.json(await work.getWorkGraph(str(req.params.hubId)));
 }));
 
 app.post('/api/work', wrap(async (req, res) => {
@@ -507,10 +507,10 @@ app.post('/api/chat/product-mode', wrap(async (req, res) => {
 
 async function handlePMConversation(
   session: pm.PMSession,
-  contextId: string,
+  hubId: string,
   userMessage: string
 ): Promise<pm.ProductModeResponse> {
-  const context = await pm.perceiveContext(contextId);
+  const context = await pm.perceiveContext(hubId);
 
   if (session.phase === 'perceiving') {
     pm.transitionPhase(session, 'shape_discovery');
@@ -538,7 +538,7 @@ async function handlePMAnalysis(
   session: pm.PMSession
 ): Promise<pm.ProductModeResponse> {
   const contract = pm.finalizeContract(session.partialContract);
-  const context = await pm.perceiveContext(session.contextId);
+  const context = await pm.perceiveContext(session.hubId);
 
   const { graph, warnings } = await pm.generateWorkGraphWithAudit(contract, context);
 
@@ -606,8 +606,8 @@ async function handlePMReview(
 
     const createdIds = await pm.createWorkFromGraph(
       graph,
-      session.contextId,
-      session.contextId
+      session.hubId,
+      session.hubId
     );
 
     pm.transitionPhase(session, 'active');
@@ -624,7 +624,7 @@ async function handlePMReview(
     };
   }
 
-  const context = await pm.perceiveContext(session.contextId);
+  const context = await pm.perceiveContext(session.hubId);
   const result = await pm.converseTurn(session, userMessage, context);
 
   pm.setPartialContract(session, result.partialContract);
@@ -647,7 +647,7 @@ async function handlePMActive(
   session: pm.PMSession,
   userMessage: string
 ): Promise<pm.ProductModeResponse> {
-  const context = await pm.perceiveContext(session.contextId);
+  const context = await pm.perceiveContext(session.hubId);
   const result = await pm.converseTurn(session, userMessage, context);
 
   pm.addTurn(session, 'pm', result.response);
@@ -659,7 +659,7 @@ async function handlePMActive(
   };
 }
 
-import { execute as runExecutor } from './operation/executor.js';
+import { execute as runExecutor } from './operations/executor.js';
 
 app.post('/api/chat/synthesize', wrap(async (req, res) => {
   const { agentId, message, history, executor: executorType, context } = req.body;
@@ -705,13 +705,13 @@ app.post('/api/chat/synthesize', wrap(async (req, res) => {
 
 // --- Product Manager ---
 app.post('/api/pm/sessions', wrap(async (req, res) => {
-  const session = await pm.createSession(req.body.contextId);
+  const session = await pm.createSession(req.body.hubId);
   res.status(201).json(session);
 }));
 
 app.get('/api/pm/sessions', wrap(async (req, res) => {
-  const contextId = req.query.contextId ? str(req.query.contextId) : undefined;
-  res.json(await pm.listSessions(contextId));
+  const hubId = req.query.hubId ? str(req.query.hubId) : undefined;
+  res.json(await pm.listSessions(hubId));
 }));
 
 app.get('/api/pm/sessions/:id', wrap(async (req, res) => {
@@ -731,7 +731,7 @@ app.post('/api/pm/sessions/:id/messages', wrap(async (req, res) => {
     return;
   }
 
-  const context = await pm.perceiveContext(session.contextId);
+  const context = await pm.perceiveContext(session.hubId);
   pm.addTurn(session, 'user', req.body.content);
 
   const result = await pm.converseTurn(session, req.body.content, context);
@@ -761,8 +761,8 @@ app.post('/api/pm/sessions/:id/execute', wrap(async (req, res) => {
 
   const createdIds = await pm.createWorkFromGraph(
     session.workGraph,
-    session.contextId,
-    req.body.ownerId || session.contextId
+    session.hubId,
+    req.body.ownerId || session.hubId
   );
 
   pm.transitionPhase(session, 'active');
@@ -774,7 +774,7 @@ app.post('/api/pm/sessions/:id/execute', wrap(async (req, res) => {
 }));
 
 app.post('/api/work/:id/decompose', wrap(async (req, res) => {
-  const { contextId } = req.body;
+  const { hubId } = req.body;
 
   const w = await work.getWork(str(req.params.id));
   if (!w) {
@@ -782,7 +782,7 @@ app.post('/api/work/:id/decompose', wrap(async (req, res) => {
     return;
   }
 
-  const context = await pm.perceiveContext(contextId || w.contextId);
+  const context = await pm.perceiveContext(hubId || w.hubId);
   const contract: pm.HandoffContract = {
     problem: w.name,
     successMetric: w.conditions[0]?.description || 'Complete the work',
@@ -794,7 +794,7 @@ app.post('/api/work/:id/decompose', wrap(async (req, res) => {
   };
 
   const { graph, warnings } = await pm.generateWorkGraphWithAudit(contract, context);
-  const createdIds = await pm.createWorkFromGraph(graph, contextId || w.contextId, w.ownerId);
+  const createdIds = await pm.createWorkFromGraph(graph, hubId || w.hubId, w.ownerId);
 
   res.json({
     parentWorkId: str(req.params.id),
@@ -837,8 +837,8 @@ app.get('/api/contexts/:id/suggested-verifiers', wrap(async (req, res) => {
 }));
 
 app.post('/api/learning/false-positive', wrap(async (req, res) => {
-  const { contextId, workId, pattern, reason } = req.body;
-  await recordFalsePositive(contextId, workId, pattern, reason);
+  const { hubId, workId, pattern, reason } = req.body;
+  await recordFalsePositive(hubId, workId, pattern, reason);
   res.json({ recorded: true });
 }));
 
@@ -889,8 +889,8 @@ app.post('/api/audit/node/:nodeId', wrap(async (req, res) => {
   res.json(result ?? { message: 'No verifications to audit' });
 }));
 
-app.post('/api/audit/context/:contextId', wrap(async (req, res) => {
-  const result = await auditNodeVerification(str(req.params.contextId));
+app.post('/api/audit/context/:hubId', wrap(async (req, res) => {
+  const result = await auditNodeVerification(str(req.params.hubId));
   res.json(result ?? { message: 'No node verifications to audit' });
 }));
 
@@ -1189,7 +1189,7 @@ app.post('/api/bridge/confirm', wrap(async (req, res) => {
 }));
 
 // --- DAO Registry ---
-import * as daoRegistry from './network/registry.js';
+import * as daoRegistry from './coordination/network/registry.js';
 
 app.get('/api/dao', wrap(async (req, res) => {
   res.json(daoRegistry.listDAOs());
@@ -1205,11 +1205,11 @@ app.get('/api/dao/:address', wrap(async (req, res) => {
 }));
 
 app.post('/api/dao', wrap(async (req, res) => {
-  const { address, name, contextPath, gitRemote, purpose, scope } = req.body;
+  const { address, name, hubPath, gitRemote, purpose, scope } = req.body;
   const dao = await daoRegistry.registerDAO({
     address,
     name,
-    contextPath,
+    hubPath,
     gitRemote,
     identity: { purpose, scope: scope ?? ['**'] },
   });
@@ -1217,10 +1217,10 @@ app.post('/api/dao', wrap(async (req, res) => {
 }));
 
 app.put('/api/dao/:address', wrap(async (req, res) => {
-  const { name, contextPath, gitRemote, purpose, scope } = req.body;
+  const { name, hubPath, gitRemote, purpose, scope } = req.body;
   const updates: Parameters<typeof daoRegistry.updateDAO>[1] = {};
   if (name) updates.name = name;
-  if (contextPath) updates.contextPath = contextPath;
+  if (hubPath) updates.hubPath = hubPath;
   if (gitRemote) updates.gitRemote = gitRemote;
   if (purpose || scope) {
     updates.identity = { purpose, scope };
@@ -1260,7 +1260,7 @@ app.get('/api/dao/:address/F', wrap(async (req, res) => {
 }));
 
 // --- Contract (Multi-chain) ---
-import * as contract from './network/contract.js';
+import * as contract from './coordination/network/contract.js';
 
 app.get('/api/contract/config', wrap(async (req, res) => {
   res.json(contract.getBridgeConfig());
@@ -1338,7 +1338,7 @@ app.post('/api/contract/deployments', wrap(async (req, res) => {
 }));
 
 // --- Network State (Cross-DAO) ---
-import * as networkState from './network/state.js';
+import * as networkState from './coordination/network/state.js';
 
 app.get('/api/network/state', wrap(async (req, res) => {
   const state = await networkState.computeNetworkState();
@@ -1627,10 +1627,10 @@ app.post('/api/hubs/create', wrap(async (req, res) => {
   // Generate unique ID: slug-uuid (readable + unique)
   const slug = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 20);
   const id = `${slug}-${randomUUID().slice(0, 8)}`;
-  const contextsDir = paths.contexts();
-  const contextDir = join(contextsDir, id);
+  const hubsDir = paths.hubs();
+  const contextDir = join(hubsDir, id);
 
-  let contextPath: string;
+  let hubPath: string;
 
   if (source?.type === 'existing') {
     // Symlink to existing codebase
@@ -1638,19 +1638,19 @@ app.post('/api/hubs/create', wrap(async (req, res) => {
       res.status(400).json({ error: 'Invalid source path' });
       return;
     }
-    if (!existsSync(contextsDir)) {
-      mkdirSync(contextsDir, { recursive: true });
+    if (!existsSync(hubsDir)) {
+      mkdirSync(hubsDir, { recursive: true });
     }
     symlinkSync(source.path, contextDir);
-    contextPath = source.path;
+    hubPath = source.path;
   } else if (source?.type === 'github') {
     // Clone from GitHub
     if (!source.repo) {
       res.status(400).json({ error: 'GitHub repo URL required' });
       return;
     }
-    if (!existsSync(contextsDir)) {
-      mkdirSync(contextsDir, { recursive: true });
+    if (!existsSync(hubsDir)) {
+      mkdirSync(hubsDir, { recursive: true });
     }
     try {
       execSync(`git clone ${source.repo} ${contextDir}`, { stdio: 'pipe' });
@@ -1658,11 +1658,11 @@ app.post('/api/hubs/create', wrap(async (req, res) => {
       res.status(500).json({ error: `Git clone failed: ${err.message}` });
       return;
     }
-    contextPath = contextDir;
+    hubPath = contextDir;
   } else {
     // New hub — create context directory with its own git repo
-    if (!existsSync(contextsDir)) {
-      mkdirSync(contextsDir, { recursive: true });
+    if (!existsSync(hubsDir)) {
+      mkdirSync(hubsDir, { recursive: true });
     }
     mkdirSync(contextDir, { recursive: true });
 
@@ -1692,27 +1692,27 @@ build/
     } catch (err: any) {
       console.warn(`Git init for context failed: ${err.message}`);
     }
-    contextPath = contextDir;
+    hubPath = contextDir;
   }
 
-  // Create context identity
-  const contextId = await createContext({
+  // Create hub identity
+  const hubId = await createHub({
     name: name.trim(),
     purpose: purpose?.trim() || 'Initiative container',
     parent: parentId,
     scope: ['**'],
   });
 
-  // Create the hub node with the context path set
+  // Create the hub node with the hub path set
   const nodeId = await identity.createNode({
     name: name.trim(),
     purpose: purpose?.trim() || '',
-    settings: { path: contextPath },
-    contextId,
+    settings: { path: hubPath },
+    hubId,
   });
 
   // Join parent hub
-  await membership.joinContext(nodeId, parentId);
+  await membership.joinHub(nodeId, parentId);
 
   res.status(201).json(await identity.getNode(nodeId));
 }));
@@ -1825,7 +1825,7 @@ app.get('/api/algedonic/project/:projectId', wrap(async (req, res) => {
 
 app.get('/api/algedonic/active-nodes', wrap(async (req, res) => {
   const pending = await algedonic.getPendingSignals();
-  const nodeIds = [...new Set(pending.map(s => s.contextId).filter(Boolean))];
+  const nodeIds = [...new Set(pending.map(s => s.hubId).filter(Boolean))];
   res.json(nodeIds);
 }));
 
@@ -1899,8 +1899,8 @@ app.get('/api/contracts/:id', wrap(async (req, res) => {
 }));
 
 app.get('/api/contracts', wrap(async (req, res) => {
-  const contexts = listContexts();
-  res.json(contexts.map(c => ({
+  const hubs = listHubs();
+  res.json(hubs.map(c => ({
     id: c.frontmatter.id,
     type: c.frontmatter.type,
     name: c.name,

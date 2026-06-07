@@ -20,30 +20,30 @@ interface ValidationResult {
 /**
  * Validate F aggregation: F(parent) = Σ F(children)
  */
-export async function validateFAggregation(contextId: string): Promise<ValidationResult> {
+export async function validateFAggregation(hubId: string): Promise<ValidationResult> {
   const { listWork } = await import('../../coordination/resources/work.js');
 
-  const workItems = await listWork({ contextId });
+  const workItems = await listWork({ hubId });
   const activeWork = workItems.filter(w => w.status !== 'fulfilled');
 
   // Sum F for each work item
   let sumWorkF = 0;
   for (const work of activeWork) {
-    const workScope = dao.context(contextId).task(work.id);
+    const workScope = dao.hub(hubId).task(work.id);
     const workF = await getFreeEnergy(workScope);
     sumWorkF += workF;
   }
 
-  // Get context F
-  const contextScope = dao.context(contextId);
-  const contextF = await getFreeEnergy(contextScope);
+  // Get hub F
+  const hubScope = dao.hub(hubId);
+  const hubF = await getFreeEnergy(hubScope);
 
-  const passed = Math.abs(contextF - sumWorkF) < 0.01;
+  const passed = Math.abs(hubF - sumWorkF) < 0.01;
 
   return {
     name: 'F Aggregation',
     passed,
-    details: `F(context) = ${contextF.toFixed(2)}, Σ F(work) = ${sumWorkF.toFixed(2)}, Δ = ${Math.abs(contextF - sumWorkF).toFixed(4)}`,
+    details: `F(hub) = ${hubF.toFixed(2)}, Σ F(work) = ${sumWorkF.toFixed(2)}, Δ = ${Math.abs(hubF - sumWorkF).toFixed(4)}`,
   };
 }
 
@@ -335,7 +335,7 @@ export async function validateStrategySelection(): Promise<ValidationResult> {
  * Validate DAO registry
  */
 export async function validateDAORegistry(): Promise<ValidationResult> {
-  const { listDAOs, getDAO, isMetaSystemRegistered } = await import('../../network/registry.js');
+  const { listDAOs, getDAO, isMetaSystemRegistered } = await import('../../coordination/network/registry.js');
 
   const registered = isMetaSystemRegistered();
   const daos = listDAOs();
@@ -361,7 +361,7 @@ export async function validateDAORegistry(): Promise<ValidationResult> {
  * Validate F_network = Σ F_dao
  */
 export async function validateFNetworkAggregation(): Promise<ValidationResult> {
-  const { computeNetworkState } = await import('../../network/state.js');
+  const { computeNetworkState } = await import('../../coordination/network/state.js');
 
   const state = await computeNetworkState();
   const sumF = state.daos.reduce((sum, d) => sum + d.F, 0);
@@ -398,7 +398,7 @@ export async function validatePrecisionInheritance(): Promise<ValidationResult> 
   const daoPrecision = await getPrecision(testVerifier, daoScope, params);
 
   // Now query at work level (child) with NO local samples
-  const workScope = dao.context('new_context').task('new_work');
+  const workScope = dao.hub('new_context').task('new_work');
 
   const workPrecision = await getPrecision(testVerifier, workScope, params);
 
@@ -417,7 +417,7 @@ export async function validatePrecisionInheritance(): Promise<ValidationResult> 
 /**
  * Run all validation checks
  */
-export async function runAllValidations(contextId?: string): Promise<ValidationResult[]> {
+export async function runAllValidations(hubId?: string): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
 
   // Core math (Phases 1-4)
@@ -442,8 +442,8 @@ export async function runAllValidations(contextId?: string): Promise<ValidationR
   results.push(await validatePrecisionInheritance());
 
   // F aggregation (needs a context with work)
-  if (contextId) {
-    results.push(await validateFAggregation(contextId));
+  if (hubId) {
+    results.push(await validateFAggregation(hubId));
   }
 
   return results;

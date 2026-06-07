@@ -11,7 +11,7 @@ import type { Proposal, ProposalType, ProposalStatus, ProposalFilter } from './t
 import { getChain } from '../channels/chain.js';
 import { checkApproval } from './threshold.js';
 import { getEffectiveGovernance } from '../../identity/contract.js';
-import { createContext } from '../../identity/context.js';
+import { createHub } from '../../identity/hub.js';
 import { createWork, postBounty, claimWork as claimWorkFromPool } from '../resources/work.js';
 import { autoVote } from './vote.js';
 import { getVotersAtScope } from './power.js';
@@ -120,9 +120,9 @@ async function updateStatus(id: string, status: ProposalStatus): Promise<void> {
 async function executeProposal(proposal: Proposal): Promise<void> {
   try {
     switch (proposal.type) {
-      case 'context': {
+      case 'hub': {
         const input = JSON.parse(proposal.target);
-        await createContext(input);
+        await createHub(input);
         break;
       }
       case 'work': {

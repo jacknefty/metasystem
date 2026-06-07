@@ -6,7 +6,7 @@
 
 export type {
   NodeAuditResult,
-  ContextAuditResult,
+  HubAuditResult,
   DaoAuditResult,
   AuditFinding,
 } from './types.js';

@@ -8,14 +8,14 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getChain } from '../coordination/channels/chain.js';
-import { listWork } from '../coordination/resources/work.js';
-import { paths } from '../identity/paths.js';
+import { getChain } from '../channels/chain.js';
+import { listWork } from '../resources/work.js';
+import { paths } from '../../identity/paths.js';
 import { listDAOs, type DAORegistration } from './registry.js';
-import { getFreeEnergy, getFreeEnergyState } from '../control/dynamics/free-energy.js';
-import { getAggregatePrecision, getPrecisionStats, type PrecisionRecord } from '../control/dynamics/precision.js';
-import { DEFAULT_PARAMETERS, type Scope } from '../control/dynamics/types.js';
-import { dao } from '../identity/scoped-paths.js';
+import { getFreeEnergy, getFreeEnergyState } from '../../control/dynamics/free-energy.js';
+import { getAggregatePrecision, getPrecisionStats, type PrecisionRecord } from '../../control/dynamics/precision.js';
+import { DEFAULT_PARAMETERS, type Scope } from '../../control/dynamics/types.js';
+import { dao } from '../../identity/scoped-paths.js';
 
 // =============================================================================
 // Types

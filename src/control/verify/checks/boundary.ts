@@ -58,7 +58,7 @@ export async function checkBoundaryRespect(
   const work = await getWork(workId);
   if (!work) return null;
 
-  const touchedFiles = await getTouchedFiles(workId, work.contextPath);
+  const touchedFiles = await getTouchedFiles(workId, work.hubPath);
   if (touchedFiles.length === 0) return null;
 
   for (const boundary of boundaries) {
@@ -115,7 +115,7 @@ function matchesPattern(file: string, patterns: string[]): boolean {
   return false;
 }
 
-async function getTouchedFiles(workId: string, contextPath?: string): Promise<string[]> {
+async function getTouchedFiles(workId: string, hubPath?: string): Promise<string[]> {
   const events = await getChain().recall({ subject: workId, type: 'work:submitted' });
   if (events.length === 0) return [];
 
@@ -125,7 +125,7 @@ async function getTouchedFiles(workId: string, contextPath?: string): Promise<st
 
   if (!branch) return [];
 
-  const cwd = contextPath ?? process.cwd();
+  const cwd = hubPath ?? process.cwd();
 
   try {
     const output = execSync(`git diff --name-only main...${branch}`, {

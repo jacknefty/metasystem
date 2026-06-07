@@ -8,8 +8,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import type { ToolResult } from './types.js';
-import { paths } from '../identity/paths.js';
-import { emitPain, emitPleasure } from '../coordination/channels/algedonic.js';
+import { paths } from '../../identity/paths.js';
+import { emitPain, emitPleasure } from '../../coordination/channels/algedonic.js';
 
 interface ToolStats {
   toolId: string;

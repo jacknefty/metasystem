@@ -108,8 +108,7 @@ export type PMPhase =
 
 export interface PMSession {
   id: string;
-  contextId: string;  // the hub this PM session is for (legacy name, prefer hubId)
-  hubId?: string;     // alias for contextId
+  hubId: string;  // the hub this PM session is for
   phase: PMPhase;
   partialContract: PartialContract;
   finalContract: HandoffContract | null;
@@ -128,7 +127,7 @@ export interface ConversationTurn {
 }
 
 export interface ProductModeRequest {
-  contextId: string;
+  hubId: string;
   message: string;
   sessionId?: string;
 }

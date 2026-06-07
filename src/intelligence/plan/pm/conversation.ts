@@ -6,7 +6,7 @@
  * No state machine, no canned questions.
  */
 
-import { execute } from '../../../operation/executor.js';
+import { execute } from '../../../operations/executor.js';
 import type { PMSession, PartialContract, InferredField, Risk, ContractConstraints, HubContext } from './types.js';
 
 export interface ConversationResult {

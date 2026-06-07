@@ -1,7 +1,7 @@
 /**
  * CreateModal — Create new nodes
  *
- * Nodes are just nodes. After creation, join to a context to establish governance.
+ * Nodes are just nodes. After creation, join to a hub to establish governance.
  */
 
 import { useState } from 'react';
@@ -10,14 +10,14 @@ import { COLORS } from '../design-system';
 import { createIdentity, joinNode, fetchDirectories, type DirectoryListing } from '../api/client';
 
 interface CreateModalProps {
-  contextId: string;
+  hubId: string;
   onClose: () => void;
   onCreated: () => void;
 }
 
 type ProjectSourceType = 'new' | 'existing' | 'github';
 
-export function CreateModal({ contextId, onClose, onCreated }: CreateModalProps) {
+export function CreateModal({ hubId, onClose, onCreated }: CreateModalProps) {
   const [step, setStep] = useState<'source' | 'details'>('source');
   const [projectSourceType, setProjectSourceType] = useState<ProjectSourceType>('new');
   const [name, setName] = useState('');
@@ -108,8 +108,8 @@ export function CreateModal({ contextId, onClose, onCreated }: CreateModalProps)
         return;
       }
 
-      // Join the context (makes contextId the S5 for this node)
-      await joinNode(node.id, contextId);
+      // Join the hub (makes hubId the S5 for this node)
+      await joinNode(node.id, hubId);
 
       onCreated();
       onClose();

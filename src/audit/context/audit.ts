@@ -4,7 +4,7 @@
  * Samples one node's verification record. Re-runs. Compares.
  */
 
-import type { ContextAuditResult } from '../types.js';
+import type { HubAuditResult } from '../types.js';
 import type { VerificationResult, CheckResult } from '../../control/verify/checks/types.js';
 import { reVerify } from '../../control/verify/completion.js';
 import { getChain } from '../../coordination/channels/chain.js';
@@ -14,9 +14,9 @@ import { getMembers } from '../../coordination/resources/membership.js';
 const LOOKBACK_DAYS = 7;
 
 export async function auditNodeVerification(
-  contextId: string
-): Promise<ContextAuditResult | null> {
-  const members = await getMembers(contextId);
+  hubId: string
+): Promise<HubAuditResult | null> {
+  const members = await getMembers(hubId);
   if (members.length === 0) return null;
 
   const member = members[Math.floor(Math.random() * members.length)];
@@ -43,8 +43,8 @@ export async function auditNodeVerification(
     nodeVerification.passed !== ourVerification.passed ||
     !checksMatch(nodeVerification.checks, ourVerification.checks);
 
-  const result: ContextAuditResult = {
-    contextId,
+  const result: HubAuditResult = {
+    hubId,
     nodeId,
     workId: nodeVerification.workId,
     timestamp: now,
@@ -54,8 +54,8 @@ export async function auditNodeVerification(
     driftDetails: drift ? describeDrift(nodeVerification, ourVerification) : undefined,
   };
 
-  await getChain().append('audit:context', contextId, nodeId, {
-    contextId: result.contextId,
+  await getChain().append('audit:hub', hubId, nodeId, {
+    hubId: result.hubId,
     nodeId: result.nodeId,
     workId: result.workId,
     nodeVerificationPassed: nodeVerification.passed,
@@ -70,7 +70,7 @@ export async function auditNodeVerification(
       nodeId,
       `Node verification drift: ${result.driftDetails}`,
       2,
-      contextId
+      hubId
     );
   }
 

@@ -17,15 +17,15 @@ export interface LearnedVerifier {
 }
 
 interface VerifierStore {
-  contextId: string;
+  hubId: string;
   verifiers: LearnedVerifier[];
 }
 
 const stores = new Map<string, VerifierStore>();
 
-export async function loadLearnedVerifiers(contextId: string): Promise<LearnedVerifier[]> {
-  if (stores.has(contextId)) {
-    return stores.get(contextId)!.verifiers;
+export async function loadLearnedVerifiers(hubId: string): Promise<LearnedVerifier[]> {
+  if (stores.has(hubId)) {
+    return stores.get(hubId)!.verifiers;
   }
 
   const events = await getChain().recall({ type: 'learning:verifier:recorded' });
@@ -33,19 +33,19 @@ export async function loadLearnedVerifiers(contextId: string): Promise<LearnedVe
   const proposedEvents = await getChain().recall({ type: 'learning:verifier:proposed' });
 
   const contextEvents = events.filter(e => {
-    const p = e.payload as { contextId: string };
-    return p.contextId === contextId;
+    const p = e.payload as { hubId: string };
+    return p.hubId === hubId;
   });
 
   const fpPatterns = new Set(
     fpEvents
-      .filter(e => (e.payload as { contextId: string }).contextId === contextId)
+      .filter(e => (e.payload as { hubId: string }).hubId === hubId)
       .map(e => (e.payload as { pattern: string }).pattern)
   );
 
   const proposedPatterns = new Set(
     proposedEvents
-      .filter(e => (e.payload as { contextId: string }).contextId === contextId)
+      .filter(e => (e.payload as { hubId: string }).hubId === hubId)
       .map(e => (e.payload as { pattern: string }).pattern)
   );
 
@@ -71,63 +71,63 @@ export async function loadLearnedVerifiers(contextId: string): Promise<LearnedVe
   }
 
   const verifiers = Array.from(patternMap.values());
-  stores.set(contextId, { contextId, verifiers });
+  stores.set(hubId, { hubId, verifiers });
 
   return verifiers;
 }
 
 export async function recordPainSignal(
-  contextId: string,
+  hubId: string,
   workId: string,
   failureDescription: string,
   suggestedVerifier: string
 ): Promise<void> {
   await getChain().append('learning:verifier:recorded', 's4', workId, {
-    contextId,
+    hubId,
     pattern: suggestedVerifier,
     failureDescription,
   });
 
-  stores.delete(contextId);
+  stores.delete(hubId);
 
-  const verifiers = await loadLearnedVerifiers(contextId);
+  const verifiers = await loadLearnedVerifiers(hubId);
   const verifier = verifiers.find(v => v.pattern === suggestedVerifier);
 
   if (verifier && verifier.catchCount >= 3 && verifier.falsePositives === 0 && !verifier.proposedToGlobal) {
-    await proposeToGlobalRegistry(contextId, verifier);
+    await proposeToGlobalRegistry(hubId, verifier);
   }
 
   console.log(`[S4/Learn] Recorded pain signal: ${suggestedVerifier} (catches: ${verifier?.catchCount || 1})`);
 }
 
 export async function recordFalsePositive(
-  contextId: string,
+  hubId: string,
   workId: string,
   pattern: string,
   reason: string
 ): Promise<void> {
   await getChain().append('learning:verifier:false-positive', 's4', workId, {
-    contextId,
+    hubId,
     pattern,
     reason,
   });
 
-  stores.delete(contextId);
+  stores.delete(hubId);
 
   console.log(`[S4/Learn] False positive recorded: ${pattern}`);
 }
 
 async function proposeToGlobalRegistry(
-  contextId: string,
+  hubId: string,
   verifier: LearnedVerifier
 ): Promise<void> {
-  await getChain().append('learning:verifier:proposed', 's4', contextId, {
-    contextId,
+  await getChain().append('learning:verifier:proposed', 's4', hubId, {
+    hubId,
     pattern: verifier.pattern,
     catchCount: verifier.catchCount,
   });
 
-  stores.delete(contextId);
+  stores.delete(hubId);
 
   console.log(`[S4/Learn] Proposed to global registry: ${verifier.pattern}`);
 }
@@ -160,8 +160,8 @@ export async function getGlobalVerifiers(): Promise<LearnedVerifier[]> {
     .sort((a, b) => b.catchCount - a.catchCount);
 }
 
-export async function suggestVerifiers(contextId: string): Promise<string[]> {
-  const learned = await loadLearnedVerifiers(contextId);
+export async function suggestVerifiers(hubId: string): Promise<string[]> {
+  const learned = await loadLearnedVerifiers(hubId);
   const global = await getGlobalVerifiers();
 
   const localSuggestions = learned

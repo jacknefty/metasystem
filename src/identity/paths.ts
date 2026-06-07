@@ -32,10 +32,15 @@ export const paths = {
   chainFile: () => join(getDataDir(), 'chain.jsonl'),
   networkCache: () => join(getDataDir(), 'network-cache.jsonl'),
 
-  // Contexts (working directories for hubs)
-  contexts: () => join(getDataDir(), 'contexts'),
-  context: (id: string) => join(getDataDir(), 'contexts', id),
-  contextIdentity: (id: string) => join(getDataDir(), 'contexts', id, 'identity.md'),
+  // Hubs (project/DAO containers - recursive VSM structure)
+  hubs: () => join(getDataDir(), 'hubs'),
+  hub: (id: string) => join(getDataDir(), 'hubs', id),
+  hubIdentity: (id: string) => join(getDataDir(), 'hubs', id, 'identity.md'),
+
+  // Legacy aliases (contexts → hubs)
+  contexts: () => join(getDataDir(), 'hubs'),
+  context: (id: string) => join(getDataDir(), 'hubs', id),
+  contextIdentity: (id: string) => join(getDataDir(), 'hubs', id, 'identity.md'),
 
   // Worktrees (isolated work execution)
   worktrees: () => join(getDataDir(), 'worktrees'),

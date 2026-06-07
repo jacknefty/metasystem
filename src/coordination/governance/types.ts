@@ -1,13 +1,13 @@
 /**
  * Governance Types — Scale-Free Voting
  *
- * Same types work at dao, context, node levels.
+ * Same types work at dao, hub, node levels.
  * No level-specific logic.
  */
 
 import type { Scope } from '../../control/dynamics/types.js';
 
-export type ProposalType = 'context' | 'work' | 'claim' | 'amendment';
+export type ProposalType = 'hub' | 'work' | 'claim' | 'amendment';
 export type ProposalStatus = 'open' | 'passed' | 'rejected' | 'expired';
 
 export interface Proposal {

@@ -7,7 +7,7 @@ import { getChain } from './coordination/channels/chain.js';
 import { initRegistry } from './control/verify/registry.js';
 import { startRuntime, stopRuntime, initializeTools } from './runtime.js';
 import { startServer } from './api.js';
-import { ensureMetaSystemRegistered } from './network/registry.js';
+import { ensureMetaSystemRegistered } from './coordination/network/registry.js';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 

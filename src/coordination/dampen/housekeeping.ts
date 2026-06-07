@@ -13,7 +13,7 @@ import { auditOwnWork } from '../../audit/node/audit.js';
 import { auditNodeVerification } from '../../audit/context/audit.js';
 import { auditContextAudit } from '../../audit/dao/audit.js';
 import { listNodes } from '../../identity/node.js';
-import { listContexts } from '../../identity/context.js';
+import { listHubs } from '../../identity/hub.js';
 
 const STARVATION_THRESHOLD_MS = 10 * 60 * 1000;
 const HOARDING_THRESHOLD_MS = 60 * 60 * 1000;
@@ -56,7 +56,7 @@ export async function detectStarvation(): Promise<string[]> {
         work.id,
         `Work unclaimed for ${Math.floor(age / 60000)} minutes`,
         2,
-        work.contextId
+        work.hubId
       );
     }
   }
@@ -163,12 +163,12 @@ async function maybeRunSporadicAudits(): Promise<void> {
     }
 
     if (Math.random() < 0.05) {
-      const contexts = listContexts();
-      if (contexts.length > 0) {
-        const context = contexts[Math.floor(Math.random() * contexts.length)];
-        const result = await auditNodeVerification(context.frontmatter.id);
+      const hubs = listHubs();
+      if (hubs.length > 0) {
+        const hub = hubs[Math.floor(Math.random() * hubs.length)];
+        const result = await auditNodeVerification(hub.frontmatter.id);
         if (result?.drift) {
-          console.log(`[S3*] Context audit drift: ${context.frontmatter.id}`);
+          console.log(`[S3*] Hub audit drift: ${hub.frontmatter.id}`);
         }
       }
     }
@@ -176,7 +176,7 @@ async function maybeRunSporadicAudits(): Promise<void> {
     if (Math.random() < 0.02) {
       const result = await auditContextAudit('dao');
       if (result?.drift) {
-        console.log(`[S3*] DAO audit drift: ${result.contextId}`);
+        console.log(`[S3*] DAO audit drift: ${result.hubId}`);
       }
     }
   } catch (err) {

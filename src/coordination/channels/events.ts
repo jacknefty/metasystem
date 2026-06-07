@@ -103,10 +103,23 @@ export type EventType =
   | 'tool:invoked'
   | 'tool:denied'
   | 'tool:audited'
-  // Context
-  | 'context:created'
-  | 'context:attention'
+  // Hub (project/DAO containers)
+  | 'hub:created'
+  | 'hub:attention'
   | 'identity:closed'
+  // Epic (major outcome grouping)
+  | 'epic:created'
+  | 'epic:completed'
+  // Story (bounty level - the contract boundary)
+  | 'story:created'
+  | 'story:posted'
+  | 'story:claimed'
+  | 'story:submitted'
+  | 'story:verified'
+  | 'story:completed'
+  // Task (agent's internal decomposition)
+  | 'task:created'
+  | 'task:completed'
   // Governance
   | 'proposal:created'
   | 'proposal:status'
@@ -119,7 +132,7 @@ export type EventType =
   | 'verify:completion'
   // Audit (S3*)
   | 'audit:node'
-  | 'audit:context'
+  | 'audit:hub'
   | 'audit:dao'
   // Identity Root Sync
   | 'identity:root:changed'
@@ -175,19 +188,19 @@ export interface EventPayloads {
   'identity:settings': Partial<NodeSettings>;
 
   'membership:joined': {
-    context: string;
+    hub: string;
     role?: string;
   };
 
   'membership:left': {
-    context: string;
+    hub: string;
     reason?: string;
   };
 
   'work:created': {
     name: string;
-    contextId: string;
-    contextPath?: string;  // optional - can be resolved from context node at execution time
+    hubId: string;
+    hubPath?: string;  // optional - can be resolved from hub node at execution time
     conditions: Condition[];
     dependsOn?: string[];
     contract?: WorkContract;
@@ -248,7 +261,7 @@ export interface EventPayloads {
     workId?: string;
     conditionId?: string;
     context?: string;      // descriptive label
-    contextId?: string;    // scope identifier
+    hubId?: string;        // hub scope identifier
     daoAddress?: string;   // DAO scope identifier
   };
 
@@ -257,49 +270,49 @@ export interface EventPayloads {
     workId?: string;
     conditionId?: string;
     context?: string;
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
   'variety:env:in': {
     bits: number;
     context?: string;
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
   'variety:env:out': {
     bits: number;
     context?: string;
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
   'variety:coord:in': {
     bits: number;
     context?: string;
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
   'variety:coord:out': {
     bits: number;
     context?: string;
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
   'variety:identity:in': {
     bits: number;
     context?: string;
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
   'variety:identity:out': {
     bits: number;
     context?: string;
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
@@ -310,7 +323,7 @@ export interface EventPayloads {
     amount: string;
     proofHash: string;
     tokenId?: string;      // ERC-1155 tokenId (hex string)
-    contextId?: string;
+    hubId?: string;
     daoAddress?: string;
   };
 
@@ -448,7 +461,7 @@ export interface EventPayloads {
   'dao:registered': {
     address: string;
     name: string;
-    contextPath?: string;
+    hubPath?: string;
     gitRemote?: string;
   };
 
@@ -489,8 +502,8 @@ export interface EventPayloads {
     severity: 1 | 2 | 3;
     source: string;
     message: string;
-    contextId?: string;
-    originContextId?: string;
+    hubId?: string;
+    originHubId?: string;
     escalationLevel?: number;
     requiresAttestation?: boolean;
   };
@@ -499,7 +512,7 @@ export interface EventPayloads {
     significance: 1 | 2 | 3;
     source: string;
     message: string;
-    contextId?: string;
+    hubId?: string;
   };
 
   'algedonic:acknowledged': {
@@ -518,7 +531,7 @@ export interface EventPayloads {
   };
 
   'pm:session:created': {
-    contextId: string;
+    hubId: string;
   };
 
   'pm:message': {
@@ -583,19 +596,19 @@ export interface EventPayloads {
   };
 
   'learning:verifier:recorded': {
-    contextId: string;
+    hubId: string;
     pattern: string;
     failureDescription: string;
   };
 
   'learning:verifier:false-positive': {
-    contextId: string;
+    hubId: string;
     pattern: string;
     reason: string;
   };
 
   'learning:verifier:proposed': {
-    contextId: string;
+    hubId: string;
     pattern: string;
     catchCount: number;
   };
@@ -617,14 +630,14 @@ export interface EventPayloads {
     discrepancy?: string;
   };
 
-  'context:created': {
+  'hub:created': {
     name: string;
     purpose: string;
     parent: string;
     scope: string[];
   };
 
-  'context:attention': {
+  'hub:attention': {
     reason: string;
     source: string;
     severity: 1 | 2 | 3;
@@ -634,10 +647,78 @@ export interface EventPayloads {
     closedAt: string;
   };
 
+  // Epic
+  'epic:created': {
+    name: string;
+    outcome: string;
+    hubId: string;
+    scopePath: string;
+    parentPath: string;
+  };
+
+  'epic:completed': {
+    completedAt: number;
+  };
+
+  // Story (bounty level)
+  'story:created': {
+    name: string;
+    outcome: string;
+    epicId: string;
+    hubId: string;
+    conditions: Condition[];
+    leverage?: number;
+    uncertainty?: number;
+    scopePath: string;
+    parentPath: string;
+  };
+
+  'story:posted': {
+    bounty: Bounty;
+    claimableWhen?: { storiesCompleted?: string[] };
+  };
+
+  'story:claimed': {
+    nodeId: string;
+    claimedAt: number;
+    deadline: number;
+  };
+
+  'story:submitted': {
+    branch: string;
+    submittedAt: number;
+  };
+
+  'story:verified': {
+    passed: boolean;
+    results: Array<{ conditionId: string; passed: boolean; evidence: string }>;
+    verifiedAt: number;
+  };
+
+  'story:completed': {
+    success: boolean;
+    completedAt: number;
+  };
+
+  // Task (agent's internal decomposition)
+  'task:created': {
+    name: string;
+    parentType: 'story' | 'task';
+    parentId: string;
+    storyId: string;
+    scopePath: string;
+    parentPath: string;
+  };
+
+  'task:completed': {
+    success: boolean;
+    completedAt: number;
+  };
+
   // Governance
   'proposal:created': {
     id: string;
-    type: 'context' | 'work' | 'claim' | 'amendment';
+    type: 'hub' | 'work' | 'claim' | 'amendment';
     scope: { level: string; id?: string; address?: string };
     proposer: string;
     target: string;
@@ -698,8 +779,8 @@ export interface EventPayloads {
     driftDetails?: string;
   };
 
-  'audit:context': {
-    contextId: string;
+  'audit:hub': {
+    hubId: string;
     nodeId: string;
     workId: string;
     nodeVerificationPassed: boolean;
@@ -710,10 +791,10 @@ export interface EventPayloads {
 
   'audit:dao': {
     daoId: string;
-    contextId: string;
+    hubId: string;
     nodeId: string;
     workId: string;
-    contextSaidDrift: boolean;
+    hubSaidDrift: boolean;
     weSayDrift: boolean;
     drift: boolean;
   };

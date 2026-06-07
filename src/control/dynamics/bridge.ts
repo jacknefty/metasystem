@@ -114,7 +114,7 @@ export interface CreditLeaf {
   amount: bigint;
   proofHash: string;
   tokenId: string;              // ERC-1155 tokenId (hex string for uint256)
-  contextId?: string;
+  hubId?: string;
   daoAddress?: string;
   verificationStrategy: VerificationStrategy;
   τ: number;
@@ -268,7 +268,7 @@ export async function createCredit(
   workProof: WorkProof,
   scope: Scope,
   tokenId: string,
-  contextId?: string,
+  hubId?: string,
   daoAddress?: string,
   params: DynamicsParameters = DEFAULT_PARAMETERS
 ): Promise<CreditLeaf> {
@@ -285,7 +285,7 @@ export async function createCredit(
     amount,
     proofHash,
     tokenId,
-    contextId,
+    hubId,
     daoAddress,
     verificationStrategy: strategyResult.strategy,
     τ,
