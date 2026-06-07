@@ -20,6 +20,7 @@ export const paths = {
   // Identity
   identity: () => join(getDataDir(), 'identity'),
   nodeIdentity: () => join(getDataDir(), 'identity', 'node.json'),
+  daoIdentity: () => join(getDataDir(), 'identity.md'),
 
   // Nodes (each node has its own directory with identity.md)
   nodes: () => join(getDataDir(), 'nodes'),
@@ -34,6 +35,7 @@ export const paths = {
   // Contexts (working directories for hubs)
   contexts: () => join(getDataDir(), 'contexts'),
   context: (id: string) => join(getDataDir(), 'contexts', id),
+  contextIdentity: (id: string) => join(getDataDir(), 'contexts', id, 'identity.md'),
 
   // Worktrees (isolated work execution)
   worktrees: () => join(getDataDir(), 'worktrees'),

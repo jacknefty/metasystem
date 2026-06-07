@@ -18,6 +18,7 @@ export interface CreateNodeInput {
   purpose: string;
   scope?: string[];
   settings?: Partial<NodeSettings>;
+  contextId?: string;
   isRoot?: boolean;
 }
 
@@ -76,7 +77,25 @@ function ensureNodeDirectory(nodeId: string, input: CreateNodeInput): void {
 
 function generateIdentityMd(nodeId: string, input: CreateNodeInput): string {
   const scope = input.scope ?? ['**'];
-  return `# ${input.name}
+  const autonomyLevel = input.settings?.autonomyLevel ?? 'supervised';
+
+  let membershipsYaml = '';
+  if (input.contextId) {
+    membershipsYaml = `memberships:
+  - context: ${input.contextId}
+    role: contributor
+    capacity: 1.0
+`;
+  }
+
+  return `---
+id: ${nodeId}
+type: node
+${membershipsYaml}created: ${new Date().toISOString()}
+closes: conditions
+---
+
+# ${input.name}
 
 ## Purpose
 
@@ -86,14 +105,25 @@ ${input.purpose}
 
 ${scope.map(s => `- \`${s}\``).join('\n')}
 
-## Identity
+## Closure Conditions
 
-- **ID**: ${nodeId}
-- **Created**: ${new Date().toISOString()}
+- [ ] All assigned work completed
+- [ ] No pending obligations
 
-## Memory
+## Resources
 
-This node's learned patterns and preferences are stored in the \`memory/\` directory.
+- **Tools**: \`builtin:*\`
+- **Autonomy**: ${autonomyLevel}
+
+## Obligations
+
+- Complete assigned work
+- Operate within declared scope
+
+## Boundaries
+
+- Will not exceed declared scope
+- Will not access undeclared resources
 `;
 }
 

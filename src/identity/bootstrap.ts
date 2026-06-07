@@ -5,6 +5,7 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { randomUUID } from 'crypto';
 import { paths } from './paths.js';
 
 export interface NetworkConfig {
@@ -80,6 +81,14 @@ export function bootstrap(): void {
     console.log(`  Created ${paths.config()}`);
   }
 
+  // Create DAO identity if not exists
+  const daoIdentityPath = paths.daoIdentity();
+  if (!existsSync(daoIdentityPath)) {
+    const daoIdentity = generateDaoIdentity();
+    writeFileSync(daoIdentityPath, daoIdentity);
+    console.log(`  Created ${daoIdentityPath}`);
+  }
+
   // Create extension manifests
   const extensionDirs = [
     paths.extensions.verifiers(),
@@ -121,4 +130,43 @@ export function updateConfig(updates: Partial<Config>): void {
   const current = getConfig();
   const updated = { ...current, ...updates };
   writeFileSync(paths.config(), JSON.stringify(updated, null, 2));
+}
+
+function generateDaoIdentity(): string {
+  const id = `dao_${randomUUID().slice(0, 8)}`;
+  return `---
+id: ${id}
+type: dao
+created: ${new Date().toISOString()}
+closes: never
+---
+
+# MetaSystem DAO
+
+## Purpose
+
+Autonomous coordination infrastructure for verified work.
+
+## Scope
+
+- \`**\`
+
+## Closure Conditions
+
+This DAO does not close. Dissolution requires governance vote.
+
+## Resources
+
+- **Chain**: local
+- **Token**: $LOOP
+
+## Obligations
+
+- Maintain system viability
+- Honor token holder rights
+
+## Boundaries
+
+- Will not compromise user privacy
+`;
 }

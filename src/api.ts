@@ -13,6 +13,8 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { paths } from './identity/paths.js';
 import * as identity from './identity/node.js';
+import { createContext, listContexts } from './identity/context.js';
+import { loadIdentity, getIdentityRoot } from './identity/index.js';
 import * as pool from './coordination/resources/pool.js';
 import * as homeostat from './control/balance/homeostat.js';
 import * as operation from './operation/execute.js';
@@ -1566,11 +1568,20 @@ build/
     contextPath = contextDir;
   }
 
+  // Create context identity
+  const contextId = await createContext({
+    name: name.trim(),
+    purpose: purpose?.trim() || 'Initiative container',
+    parent: parentId,
+    scope: ['**'],
+  });
+
   // Create the hub node with the context path set
   const nodeId = await identity.createNode({
     name: name.trim(),
     purpose: purpose?.trim() || '',
     settings: { path: contextPath },
+    contextId,
   });
 
   // Join parent hub
@@ -1735,6 +1746,151 @@ app.get('/api/tools/:id', wrap(async (req, res) => {
     return;
   }
   res.json(tool);
+}));
+
+// --- Identity Contracts ---
+app.get('/api/contracts/:id', wrap(async (req, res) => {
+  const contract = loadIdentity(str(req.params.id));
+  if (!contract) {
+    res.status(404).json({ error: 'Identity contract not found' });
+    return;
+  }
+  res.json({
+    id: contract.frontmatter.id,
+    type: contract.frontmatter.type,
+    name: contract.name,
+    purpose: contract.purpose,
+    scope: contract.scope,
+    closureConditions: contract.closureConditions,
+    resources: contract.resources,
+    obligations: contract.obligations,
+    boundaries: contract.boundaries,
+    created: contract.frontmatter.created,
+    closes: contract.frontmatter.closes,
+    closed: contract.frontmatter.closed,
+  });
+}));
+
+app.get('/api/contracts', wrap(async (req, res) => {
+  const contexts = listContexts();
+  res.json(contexts.map(c => ({
+    id: c.frontmatter.id,
+    type: c.frontmatter.type,
+    name: c.name,
+    purpose: c.purpose,
+    parent: c.frontmatter.parent,
+  })));
+}));
+
+app.get('/api/identity/root', wrap(async (req, res) => {
+  const root = getIdentityRoot();
+  res.json({ root });
+}));
+
+// --- Governance ---
+import * as governance from './coordination/governance/index.js';
+
+app.post('/api/proposals', wrap(async (req, res) => {
+  const { type, scope, proposer, target, resourcesRequested } = req.body;
+  const id = await governance.createProposal({
+    type,
+    scope,
+    proposer,
+    target,
+    resourcesRequested,
+  });
+  res.json({ id });
+}));
+
+app.get('/api/proposals', wrap(async (req, res) => {
+  const filter: governance.ProposalFilter = {};
+  if (req.query.status) filter.status = str(req.query.status) as governance.ProposalStatus;
+  if (req.query.type) filter.type = str(req.query.type) as governance.ProposalType;
+  if (req.query.proposer) filter.proposer = str(req.query.proposer);
+  const proposals = await governance.listProposals(filter);
+  res.json(proposals);
+}));
+
+app.get('/api/proposals/:id', wrap(async (req, res) => {
+  const proposal = await governance.getProposal(str(req.params.id));
+  if (!proposal) {
+    res.status(404).json({ error: 'Proposal not found' });
+    return;
+  }
+  res.json(proposal);
+}));
+
+app.post('/api/proposals/:id/vote', wrap(async (req, res) => {
+  const { voter } = req.body;
+  const proposal = await governance.getProposal(str(req.params.id));
+  if (!proposal) {
+    res.status(404).json({ error: 'Proposal not found' });
+    return;
+  }
+  const vote = await governance.castVote(voter, proposal.id, proposal.scope);
+  res.json(vote);
+}));
+
+app.get('/api/proposals/:id/votes', wrap(async (req, res) => {
+  const votes = await governance.getVotes(str(req.params.id));
+  res.json(votes);
+}));
+
+app.get('/api/proposals/:id/approval', wrap(async (req, res) => {
+  const proposal = await governance.getProposal(str(req.params.id));
+  if (!proposal) {
+    res.status(404).json({ error: 'Proposal not found' });
+    return;
+  }
+  const result = await governance.checkApproval(proposal);
+  res.json(result);
+}));
+
+app.post('/api/proposals/:id/finalize', wrap(async (req, res) => {
+  const proposal = await governance.finalizeProposal(str(req.params.id));
+  if (!proposal) {
+    res.status(404).json({ error: 'Proposal not found' });
+    return;
+  }
+  res.json(proposal);
+}));
+
+app.post('/api/delegations', wrap(async (req, res) => {
+  const { from, to, scope, weight } = req.body;
+  await governance.delegate(from, to, scope ?? null, weight ?? 1.0);
+  res.json({ success: true });
+}));
+
+app.delete('/api/delegations', wrap(async (req, res) => {
+  const { from, to, scope } = req.body;
+  await governance.revoke(from, to, scope ?? null);
+  res.json({ success: true });
+}));
+
+app.get('/api/delegations/:identity', wrap(async (req, res) => {
+  const delegations = await governance.getDelegations(str(req.params.identity));
+  res.json(delegations);
+}));
+
+app.get('/api/delegators/:identity', wrap(async (req, res) => {
+  const delegators = await governance.getDelegators(str(req.params.identity));
+  res.json(delegators);
+}));
+
+app.get('/api/voting-power/:identity', wrap(async (req, res) => {
+  const { level, id, address } = req.query;
+  let scope: governance.Proposal['scope'];
+  if (level === 'dao') {
+    scope = { level: 'dao', address: str(address) };
+  } else if (level === 'context') {
+    scope = { level: 'context', id: str(id) };
+  } else if (level === 'node') {
+    scope = { level: 'node', id: str(id) };
+  } else {
+    scope = { level: 'network' };
+  }
+  const power = await governance.getVotingPower(str(req.params.identity), scope);
+  res.json(power);
 }));
 
 // Error handler

@@ -11,7 +11,8 @@
     "cors": "^2.8.6",
     "ethers": "^6.9.0",
     "express": "^5.2.1",
-    "minimatch": "^10.2.5"
+    "minimatch": "^10.2.5",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

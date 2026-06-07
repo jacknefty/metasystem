@@ -100,7 +100,18 @@ export type EventType =
   // Tools
   | 'tool:invoked'
   | 'tool:denied'
-  | 'tool:audited';
+  | 'tool:audited'
+  // Context
+  | 'context:created'
+  | 'identity:closed'
+  // Governance
+  | 'proposal:created'
+  | 'proposal:status'
+  | 'proposal:executed'
+  | 'vote:cast'
+  | 'delegation:created'
+  | 'delegation:revoked'
+  | 'identity:amended';
 
 export interface Condition {
   id: string;
@@ -562,6 +573,62 @@ export interface EventPayloads {
     passed: boolean;
     discrepancy?: string;
   };
+
+  'context:created': {
+    name: string;
+    purpose: string;
+    parent: string;
+    scope: string[];
+  };
+
+  'identity:closed': {
+    closedAt: string;
+  };
+
+  // Governance
+  'proposal:created': {
+    id: string;
+    type: 'context' | 'work' | 'claim' | 'amendment';
+    scope: { level: string; id?: string; address?: string };
+    proposer: string;
+    target: string;
+    resourcesRequested: number;
+    deadline: number;
+    status: 'open' | 'passed' | 'rejected' | 'expired';
+    createdAt: number;
+  };
+
+  'proposal:status': {
+    status: 'open' | 'passed' | 'rejected' | 'expired';
+  };
+
+  'proposal:executed': {
+    success: boolean;
+    error?: string;
+  };
+
+  'vote:cast': {
+    voter: string;
+    proposal: string;
+    weight: number;
+    G: number;
+    ψ: number;
+    timestamp: number;
+  };
+
+  'delegation:created': {
+    from: string;
+    to: string;
+    scope: { level: string; id?: string; address?: string } | null;
+    weight: number;
+    createdAt: number;
+  };
+
+  'delegation:revoked': {
+    scope: { level: string; id?: string; address?: string } | null;
+  };
+
+  'identity:amended': Record<string, unknown>;
 }
 
 export interface ChainEvent<T extends EventType = EventType> {
