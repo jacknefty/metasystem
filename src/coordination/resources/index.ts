@@ -52,7 +52,6 @@ export {
   queryTokens,
   getResolution,
   getSystemBalance,
-  getScopedBalance,
   bitsToAmount,
   generateProofHash,
   mintCredit,
@@ -64,7 +63,6 @@ export {
   type Resolution,
   type PendingCredit,
   type SystemBalance,
-  type VarietyScope,
 } from './token.js';
 
 // Pool (work selection)

@@ -97,7 +97,7 @@ function checkNodePolicy(node: DerivedNode, tool: ToolSpec): ToolAccessDecision 
   }
 
   if (settings.allowedTools) {
-    const hasMatch = settings.allowedTools.some(pattern =>
+    const hasMatch = settings.allowedTools.some((pattern: string) =>
       matchesPattern(tool, pattern)
     );
 
