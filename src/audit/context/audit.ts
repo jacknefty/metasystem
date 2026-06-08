@@ -1,5 +1,5 @@
 /**
- * Context S3* (Sample Nodes)
+ * Context Audit (Sample Nodes)
  *
  * Samples one node's verification record. Re-runs. Compares.
  */

@@ -10,7 +10,7 @@ interface CubeProps {
 }
 
 // Variant 1: Clean isometric cube with edge glow
-export function CubeClean({ glowColor = COLORS.s5.primary, size = 120 }: CubeProps) {
+export function CubeClean({ glowColor = COLORS.identity.primary, size = 120 }: CubeProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
@@ -54,7 +54,7 @@ export function CubeClean({ glowColor = COLORS.s5.primary, size = 120 }: CubePro
 }
 
 // Variant 2: Circuit-traced cube
-export function CubeCircuit({ glowColor = COLORS.s5.primary, size = 120 }: CubeProps) {
+export function CubeCircuit({ glowColor = COLORS.identity.primary, size = 120 }: CubeProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
@@ -169,7 +169,7 @@ export function CubeCircuit({ glowColor = COLORS.s5.primary, size = 120 }: CubeP
 }
 
 // Variant 3: Hexagonal tech cube
-export function CubeHex({ glowColor = COLORS.s5.primary, size = 120 }: CubeProps) {
+export function CubeHex({ glowColor = COLORS.identity.primary, size = 120 }: CubeProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
@@ -217,7 +217,7 @@ export function CubeHex({ glowColor = COLORS.s5.primary, size = 120 }: CubeProps
 }
 
 // Variant 4: Wireframe holographic cube
-export function CubeWireframe({ glowColor = COLORS.s5.primary, size = 120 }: CubeProps) {
+export function CubeWireframe({ glowColor = COLORS.identity.primary, size = 120 }: CubeProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
@@ -265,7 +265,7 @@ export function CubeWireframe({ glowColor = COLORS.s5.primary, size = 120 }: Cub
 }
 
 // Variant 5: Solid tech cube with panel lines
-export function CubeTech({ glowColor = COLORS.s5.primary, size = 120 }: CubeProps) {
+export function CubeTech({ glowColor = COLORS.identity.primary, size = 120 }: CubeProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
@@ -325,7 +325,7 @@ export function CubeTech({ glowColor = COLORS.s5.primary, size = 120 }: CubeProp
 }
 
 // Variant 6: Minimal with strong glow on all edges
-export function CubeMinimal({ glowColor = COLORS.s5.primary, size = 120 }: CubeProps) {
+export function CubeMinimal({ glowColor = COLORS.identity.primary, size = 120 }: CubeProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
@@ -370,7 +370,7 @@ export function CubeMinimal({ glowColor = COLORS.s5.primary, size = 120 }: CubeP
 // Mockup showcase page
 export function CubeMockups() {
   const colors = [
-    { name: 'S5 (Gold)', color: COLORS.s5.primary },
+    { name: 'Identity (Gold)', color: COLORS.identity.primary },
     { name: 'Member (Cyan)', color: COLORS.member.primary },
     { name: 'Project (Violet)', color: COLORS.project.primary },
   ];

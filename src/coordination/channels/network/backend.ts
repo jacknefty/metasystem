@@ -3,6 +3,13 @@
  *
  * Translates contract events ↔ ChainEvents.
  * Same interface as LocalChain.
+ *
+ * SCALE-FREE RECURSION:
+ * Network events include scopePath (dao.root()) so variety flows
+ * through spine ports just like local events. This ensures:
+ * - Free energy computed consistently at all recursion levels
+ * - Port overflow tracked for network-origin work
+ * - Same homeostat behavior whether work is local or network
  */
 
 import { EventEmitter } from 'events';
@@ -10,8 +17,10 @@ import { ethers } from 'ethers';
 import type { ChainBackend, EventFilter } from '../backend.js';
 import type { ChainEvent, EventType, EventPayloads, NetworkOrigin } from '../events.js';
 import { getDAOContract } from './evm/contracts.js';
+import { dao } from '../../../identity/scoped-paths.js';
 
 const LOOP_SCALE = 1e18;
+const DAO_SCOPE_PATH = dao.root();
 
 export class NetworkChain extends EventEmitter implements ChainBackend {
   private eventCache: ChainEvent[] = [];
@@ -149,6 +158,8 @@ export class NetworkChain extends EventEmitter implements ChainBackend {
           bits: Number(bounty) / LOOP_SCALE,
           workId,
           context: 'network-bounty',
+          daoAddress,
+          scopePath: DAO_SCOPE_PATH,  // Scale-free: routes through spine ports
         },
       });
     });
@@ -216,6 +227,8 @@ export class NetworkChain extends EventEmitter implements ChainBackend {
           bits: Number(reward) / LOOP_SCALE,
           workId,
           context: 'network-fulfilled',
+          daoAddress,
+          scopePath: DAO_SCOPE_PATH,  // Scale-free: routes through spine ports
         },
       });
 

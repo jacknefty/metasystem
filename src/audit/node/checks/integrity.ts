@@ -1,5 +1,5 @@
 /**
- * Contribution Integrity Check (S3* only)
+ * Contribution Integrity Check (sporadic audit only)
  *
  * Does credit:earned match actual deliverables?
  * Retrospective by nature — only makes sense after credit exists.

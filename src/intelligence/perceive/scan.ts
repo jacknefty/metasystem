@@ -1,8 +1,8 @@
 /**
- * S4 Perception — Scan environment for variety
+ * Intelligence Perception — Scan environment for variety
  *
- * Perception IS variety generation. What S4 perceives becomes
- * variety:env:in that S3 must absorb.
+ * Perception IS variety generation. What Intelligence perceives becomes
+ * variety:env:in that Control must absorb.
  */
 
 import { execSync } from 'child_process';
@@ -84,7 +84,7 @@ export async function perceiveEnvironment(
   let varietyEmitted = 0;
   for (const finding of findings) {
     const bits = finding.severity * 5;
-    await emitVariety('env', 'in', 's4', hubId, bits, {
+    await emitVariety('env', 'in', 'intelligence', hubId, bits, {
       context: finding.source,
     });
     varietyEmitted += bits;
@@ -95,7 +95,7 @@ export async function perceiveEnvironment(
   }
 
   if (findings.length > 0) {
-    console.log(`[S4] Perceived ${findings.length} findings (${varietyEmitted} bits) in ${hubId}`);
+    console.log(`[Intelligence] Perceived ${findings.length} findings (${varietyEmitted} bits) in ${hubId}`);
   }
 
   return {

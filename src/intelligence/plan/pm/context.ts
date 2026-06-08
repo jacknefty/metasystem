@@ -1,7 +1,7 @@
 /**
  * Context Perception — Read project state to pre-fill contract
  *
- * S4 perceives before asking. Reads:
+ * Intelligence perceives before asking. Reads:
  * - Project files (README, package.json, source structure)
  * - Chain events (prior work, what succeeded, what failed)
  * - Existing patterns (test frameworks, languages, architectures)

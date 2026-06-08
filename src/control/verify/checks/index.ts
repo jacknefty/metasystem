@@ -1,5 +1,5 @@
 /**
- * Completion Checks (S3)
+ * Completion Checks (Control)
  *
  * Checks run on every work completion.
  */

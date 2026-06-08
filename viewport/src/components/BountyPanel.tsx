@@ -1,7 +1,7 @@
 /**
  * BountyPanel — Shows bounties for a node
  *
- * Every node can be both S5 (to its members) and S1 (to contexts it joined).
+ * Every node can be both Identity (to its members) and Operations (to contexts it joined).
  * This panel shows both views when applicable:
  * - Posted bounties (if this node has members or owns work)
  * - Available bounties (from contexts this node is a member of)
@@ -62,8 +62,8 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
       // Available bounties: work from contexts we're members of (excluding our own)
       const memberContexts = memberships.map(m => m.hub);
       const available = pool.filter(b =>
-        memberContexts.includes(b.projectId) &&
-        b.projectId !== nodeId &&
+        memberContexts.includes(b.hubId) &&
+        b.hubId !== nodeId &&
         b.bountyStatus === 'posted' &&
         !b.claim
       );
@@ -108,7 +108,7 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
     switch (status) {
       case 'posted': return COLORS.status.healthy;
       case 'claimed': return COLORS.status.warning;
-      case 'submitted': return COLORS.localProject.primary;
+      case 'submitted': return COLORS.localHub.primary;
       case 'verified': return COLORS.localRoot.primary;
       case 'completed': return COLORS.status.healthy;
       case 'failed': return COLORS.status.critical;
@@ -126,12 +126,12 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
 
   const hasMembers = members.length > 0;
   const hasPostedBounties = postedBounties.length > 0;
-  const showS5View = hasMembers || hasPostedBounties || isRoot;
+  const showIdentityView = hasMembers || hasPostedBounties || isRoot;
 
   return (
     <div className="space-y-6">
-      {/* S5 View: Posted bounties (if this node has members or posted work) */}
-      {showS5View && (
+      {/* Identity View: Posted bounties (if this node has members or posted work) */}
+      {showIdentityView && (
         <div>
           <div className="text-xs uppercase tracking-wide mb-2" style={{ color: COLORS.localRoot.text }}>
             Posted Bounties ({postedBounties.length})
@@ -153,7 +153,7 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
                 <div className="text-xs" style={{ color: COLORS.text.muted }}>Claimed</div>
               </div>
               <div className="p-2 rounded text-center" style={{ background: COLORS.bg.elevated }}>
-                <div className="text-lg font-mono" style={{ color: COLORS.localProject.primary }}>
+                <div className="text-lg font-mono" style={{ color: COLORS.localHub.primary }}>
                   {postedBounties.filter(b => b.bountyStatus === 'submitted').length}
                 </div>
                 <div className="text-xs" style={{ color: COLORS.text.muted }}>Submitted</div>
@@ -207,11 +207,11 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
       )}
 
       {/* Divider if showing both views */}
-      {showS5View && !isRoot && (
+      {showIdentityView && !isRoot && (
         <div style={{ borderTop: `1px solid ${COLORS.border.subtle}`, marginTop: 16, marginBottom: 16 }} />
       )}
 
-      {/* S1 View: Available bounties and reputation (if not just root) */}
+      {/* Operations View: Available bounties and reputation (if not just root) */}
       {!isRoot && (
         <>
           {/* Reputation */}
@@ -221,7 +221,7 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
                 <div className="text-xs uppercase tracking-wide" style={{ color: COLORS.text.muted }}>
                   Your Reputation
                 </div>
-                <div className="text-sm font-mono" style={{ color: COLORS.localS1.primary }}>
+                <div className="text-sm font-mono" style={{ color: COLORS.localOperations.primary }}>
                   {Math.round(reputation.completionRate * 100)}%
                 </div>
               </div>
@@ -239,7 +239,7 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
                   <div className="text-xs" style={{ color: COLORS.text.muted }}>Released</div>
                 </div>
                 <div>
-                  <div className="text-lg font-mono" style={{ color: COLORS.localS1.primary }}>
+                  <div className="text-lg font-mono" style={{ color: COLORS.localOperations.primary }}>
                     {reputation.totalEarned}
                   </div>
                   <div className="text-xs" style={{ color: COLORS.text.muted }}>Earned</div>
@@ -321,7 +321,7 @@ export function BountyPanel({ nodeId, isRoot, memberships }: BountyPanelProps) {
                         <div className="flex-1">
                           <div style={{ color: COLORS.text.primary }}>{b.name}</div>
                           <div className="text-xs mt-1 flex items-center gap-2" style={{ color: COLORS.text.muted }}>
-                            <span className="font-mono" style={{ color: COLORS.localS1.primary }}>
+                            <span className="font-mono" style={{ color: COLORS.localOperations.primary }}>
                               {b.bounty?.amount || 0} variety
                             </span>
                             <span>·</span>

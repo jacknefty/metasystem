@@ -71,7 +71,7 @@ function buildConversationPrompt(
 
   const currentFields = formatCurrentFields(session.partialContract);
 
-  return `You are S4 (Intelligence/Future) in a Viable System Model, acting as a Product Manager.
+  return `You are Intelligence (future-oriented) in a Viable System Model, acting as a Product Manager.
 
 Your job: Have a natural conversation to understand what the user wants to build, then break it into work contracts.
 

@@ -183,7 +183,7 @@ export async function resolveContextSettings(hubId: string): Promise<NodeSetting
   const node = await getNode(hubId);
 
   if (!node) {
-    console.warn(`[S5] Context ${hubId} not found, using defaults`);
+    console.warn(`[Identity] Context ${hubId} not found, using defaults`);
     return { ...DEFAULT_SETTINGS };
   }
 

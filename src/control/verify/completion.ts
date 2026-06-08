@@ -1,5 +1,5 @@
 /**
- * Completion Verification (S3)
+ * Completion Verification (Control)
  *
  * Runs all checks on work completion. Produces verification record.
  */

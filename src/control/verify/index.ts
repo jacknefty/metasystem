@@ -22,5 +22,5 @@ export {
 // Types
 export type { VerifierResult, ConditionInput, VerifyContext } from './types.js';
 
-// Completion (S3 verification)
+// Completion (Control verification)
 export { verifyCompletion, reVerify, runChecks } from './completion.js';

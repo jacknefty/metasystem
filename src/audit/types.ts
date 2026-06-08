@@ -1,5 +1,5 @@
 /**
- * Audit Types (S3*)
+ * Audit Types (sporadic)
  *
  * Sporadic re-verification of past verifications.
  */

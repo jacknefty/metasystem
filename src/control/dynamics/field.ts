@@ -1,5 +1,5 @@
 /**
- * S4 Field — Derived from Free Energy
+ * Intelligence Field — Derived from Free Energy
  *
  * Gaps, opportunities, threats are interpretations of the F landscape:
  * - Gaps = high F regions we've never explored (high epistemic value)
@@ -12,7 +12,7 @@ import { listWork, listAvailableWork } from '../../coordination/resources/work.j
 import type {
   Scope,
   Configuration,
-  S4Field,
+  IntelligenceField,
   CapabilityGap,
   Opportunity,
   Threat,
@@ -24,7 +24,7 @@ import { getAggregatePrecision, getPrecisionStats } from './precision.js';
 // Field Construction
 // =============================================================================
 
-export async function buildS4Field(scope: Scope): Promise<S4Field> {
+export async function buildIntelligenceField(scope: Scope): Promise<IntelligenceField> {
   const [F, gaps, opportunities, threats] = await Promise.all([
     getFreeEnergy(scope),
     buildGaps(scope),
@@ -172,7 +172,7 @@ export async function getNearestGap(
   scope: Scope,
   Q: Configuration
 ): Promise<CapabilityGap | null> {
-  const field = await buildS4Field(scope);
+  const field = await buildIntelligenceField(scope);
 
   if (field.gaps.length === 0) return null;
 
@@ -184,7 +184,7 @@ export async function getNearestGap(
 export async function getBestOpportunity(
   scope: Scope
 ): Promise<Opportunity | null> {
-  const field = await buildS4Field(scope);
+  const field = await buildIntelligenceField(scope);
 
   if (field.opportunities.length === 0) return null;
 
@@ -194,7 +194,7 @@ export async function getBestOpportunity(
 export async function getActiveThreats(
   scope: Scope
 ): Promise<Threat[]> {
-  const field = await buildS4Field(scope);
+  const field = await buildIntelligenceField(scope);
   return field.threats.filter(t => t.severity > 0.3);
 }
 

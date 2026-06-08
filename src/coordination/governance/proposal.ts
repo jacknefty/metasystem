@@ -20,12 +20,13 @@ import { getNode } from '../../identity/node.js';
 export interface CreateProposalInput {
   type: ProposalType;
   scope: Scope;
-  proposer: string;
+  proposer?: string;
   target: string;
   resourcesRequested: number;
+  metadata?: Record<string, unknown>;
 }
 
-export async function createProposal(input: CreateProposalInput): Promise<string> {
+export async function createProposal(input: CreateProposalInput): Promise<Proposal> {
   const id = `prop_${randomUUID().slice(0, 8)}`;
   const votingPeriod = getVotingPeriod(input.scope);
 
@@ -33,7 +34,7 @@ export async function createProposal(input: CreateProposalInput): Promise<string
     id,
     type: input.type,
     scope: input.scope,
-    proposer: input.proposer,
+    proposer: input.proposer ?? 'system',
     target: input.target,
     resourcesRequested: input.resourcesRequested,
     deadline: Date.now() + votingPeriod,
@@ -43,14 +44,14 @@ export async function createProposal(input: CreateProposalInput): Promise<string
 
   await getChain().append(
     'proposal:created',
-    input.proposer,
+    input.proposer ?? 'system',
     id,
     proposal as unknown as import('../channels/events.js').EventPayloads['proposal:created']
   );
 
   triggerAutoVoting(proposal);
 
-  return id;
+  return proposal;
 }
 
 export async function getProposal(id: string): Promise<Proposal | null> {

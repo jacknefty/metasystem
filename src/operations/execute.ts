@@ -1,5 +1,5 @@
 /**
- * Operation — Execute Work (S1)
+ * Operations — Execute Work
  *
  * The atomic work unit: claim → execute → submit.
  * Security context wraps execution for scope enforcement.

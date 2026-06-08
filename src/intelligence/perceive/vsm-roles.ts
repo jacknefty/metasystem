@@ -8,12 +8,12 @@
  */
 
 export type VSMRole =
-  | 'S1:operations'
-  | 'S2:coordination'
-  | 'S3:control'
-  | 'S3*:audit'
-  | 'S4:intelligence'
-  | 'S5:identity'
+  | 'operations'
+  | 'coordination'
+  | 'control'
+  | 'audit'
+  | 'intelligence'
+  | 'identity'
   | 'transducer:inward'   // External variety → internal commands
   | 'transducer:outward'  // Internal state → external representation
   | 'channel:algedonic'   // Pain/pleasure bypass
@@ -34,7 +34,7 @@ export interface VSMRoleDefinition {
  */
 export const VSM_ROLES: VSMRoleDefinition[] = [
   {
-    role: 'S1:operations',
+    role: 'operations',
     question: 'What produces value here?',
     cyberneticPurpose: 'Primary production — transforms inputs into outputs that matter',
     varietyFunction: 'Generates variety through production',
@@ -46,7 +46,7 @@ export const VSM_ROLES: VSMRoleDefinition[] = [
     ],
   },
   {
-    role: 'S2:coordination',
+    role: 'coordination',
     question: 'What prevents oscillation between producers?',
     cyberneticPurpose: 'Damping — stops producers from fighting over shared resources or creating feedback loops',
     varietyFunction: 'Absorbs variety spikes, smooths temporal conflicts',
@@ -58,7 +58,7 @@ export const VSM_ROLES: VSMRoleDefinition[] = [
     ],
   },
   {
-    role: 'S3:control',
+    role: 'control',
     question: 'What allocates resources and extracts synergy?',
     cyberneticPurpose: 'Inside-and-now management — decides who gets what, ensures parts serve whole',
     varietyFunction: 'Attenuates variety through resource constraints, amplifies through delegation',
@@ -70,7 +70,7 @@ export const VSM_ROLES: VSMRoleDefinition[] = [
     ],
   },
   {
-    role: 'S3*:audit',
+    role: 'audit',
     question: 'What sporadically checks if reality matches reports?',
     cyberneticPurpose: 'Reality verification — bypasses normal channels to sample ground truth',
     varietyFunction: 'High-variety probes that pierce attenuation layers',
@@ -82,7 +82,7 @@ export const VSM_ROLES: VSMRoleDefinition[] = [
     ],
   },
   {
-    role: 'S4:intelligence',
+    role: 'intelligence',
     question: 'What scans the environment for adaptation?',
     cyberneticPurpose: 'Outside-and-then — models the future, spots opportunities and threats',
     varietyFunction: 'Amplifies environmental variety into internal models',
@@ -94,9 +94,9 @@ export const VSM_ROLES: VSMRoleDefinition[] = [
     ],
   },
   {
-    role: 'S5:identity',
+    role: 'identity',
     question: 'What defines what this system IS and is NOT?',
-    cyberneticPurpose: 'Closure — establishes boundaries, resolves S3/S4 tension, maintains ethos',
+    cyberneticPurpose: 'Closure — establishes boundaries, resolves Control/Intelligence tension, maintains ethos',
     varietyFunction: 'Ultimate variety filter — what passes must align with identity',
     examples: [
       'Software: schema registry, documentation, architecture decisions',
@@ -185,12 +185,12 @@ export function buildVSMRolesPrompt(): string {
 ${roleDescriptions}
 
 To classify any component, ask these questions in order:
-1. Does it produce the primary value? → S1:operations
-2. Does it prevent producers from fighting? → S2:coordination
-3. Does it allocate resources or set constraints? → S3:control
-4. Does it check if reports match reality? → S3*:audit
-5. Does it scan the environment for adaptation? → S4:intelligence
-6. Does it define what this system IS? → S5:identity
+1. Does it produce the primary value? → operations
+2. Does it prevent producers from fighting? → coordination
+3. Does it allocate resources or set constraints? → control
+4. Does it check if reports match reality? → audit
+5. Does it scan the environment for adaptation? → intelligence
+6. Does it define what this system IS? → identity
 7. Does it translate variety across a boundary? → transducer:inward or transducer:outward
 8. Does it carry urgent bypass signals? → channel:algedonic
 9. Does it store or transmit information? → channel:data
@@ -203,12 +203,12 @@ To classify any component, ask these questions in order:
  */
 export function getPlacementForRole(role: VSMRole): string {
   const placements: Record<VSMRole, string> = {
-    'S1:operations': 'operations/',
-    'S2:coordination': 'coordination/',
-    'S3:control': 'control/',
-    'S3*:audit': 'audit/',
-    'S4:intelligence': 'intelligence/',
-    'S5:identity': 'identity/',
+    'operations': 'operations/',
+    'coordination': 'coordination/',
+    'control': 'control/',
+    'audit': 'audit/',
+    'intelligence': 'intelligence/',
+    'identity': 'identity/',
     'transducer:inward': 'bridge/',
     'transducer:outward': 'bridge/',
     'channel:algedonic': 'bridge/',

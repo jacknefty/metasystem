@@ -15,7 +15,7 @@ import {
 } from '../api/client';
 
 interface WaveGraphProps {
-  projectId: string;
+  hubId: string;
   compact?: boolean;
 }
 
@@ -104,16 +104,16 @@ function calculatePositions(graph: WorkGraph): Map<string, NodePosition> {
   return positions;
 }
 
-export function WaveGraph({ projectId, compact = false }: WaveGraphProps) {
+export function WaveGraph({ hubId, compact = false }: WaveGraphProps) {
   const [graph, setGraph] = useState<WorkGraph | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [pulsingNodes, setPulsingNodes] = useState<Set<string>>(new Set());
   const svgRef = useRef<SVGSVGElement>(null);
 
   const loadGraph = useCallback(async () => {
-    const data = await fetchWorkGraph(projectId);
+    const data = await fetchWorkGraph(hubId);
     setGraph(data);
-  }, [projectId]);
+  }, [hubId]);
 
   useEffect(() => {
     loadGraph();

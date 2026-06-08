@@ -1,14 +1,19 @@
 /**
- * Algedonic — Pain/pleasure signals that bypass normal channels
+ * Algedonic — Pain/pleasure signals via alarm port
  *
- * Severity levels:
- * 1 — Minor (logged, no escalation)
- * 2 — Significant (requires attention)
- * 3 — Critical (escalates up recursion until acknowledged)
+ * Severity levels map to escalation ladder:
+ * 1 — Minor (logged, self-correction)
+ * 2 — Significant (requires coordination/reallocation)
+ * 3 — Critical (escalates up recursion, may reach command)
+ *
+ * Algedonic signals flow through the alarm port with variety tracking.
  */
 
 import { getChain } from './chain.js';
 import type { ChainEvent } from './events.js';
+import { loadSpine, saveSpine, type PainSignal } from '../../identity/spine.js';
+import { at } from '../../identity/scoped-paths.js';
+import { paths } from '../../identity/paths.js';
 
 export interface AlgedonicSignal {
   id: string;
@@ -32,14 +37,36 @@ const MAX_ESCALATION_LEVELS = 5;
 export async function emitPain(
   source: string,
   subject: string,
-  message: string,
+  message: string | Error,
   severity: 1 | 2 | 3 = 2,
   hubId?: string
 ): Promise<AlgedonicSignal> {
+  const messageStr = message instanceof Error ? message.message : message;
+
+  const painSignal: PainSignal = {
+    severity,
+    source,
+    message: messageStr,
+    escalationLevel: 0,
+    breachedVariable: undefined,
+    requiresAttestation: severity === 3,
+  };
+
+  if (hubId) {
+    const hubScope = at(paths.hub(hubId));
+    const spine = loadSpine(hubScope);
+    if (spine) {
+      spine.alarm.currentLoad += severity * 10;
+      spine.alarm.overflow = Math.max(0, spine.alarm.currentLoad - spine.alarm.capacity);
+      spine.alarm.lastFired = Date.now();
+      saveSpine(hubScope, spine);
+    }
+  }
+
   const event = await getChain().append('algedonic:pain', source, subject, {
     severity,
     source,
-    message,
+    message: messageStr,
     hubId,
     originHubId: hubId,
     escalationLevel: 0,
@@ -50,7 +77,7 @@ export async function emitPain(
     type: 'pain',
     severity,
     source,
-    message,
+    message: messageStr,
     subject,
     hubId,
     originHubId: hubId,
@@ -126,6 +153,15 @@ async function escalatePain(signal: AlgedonicSignal): Promise<void> {
   for (const parentId of parentHubs) {
     console.log(`[Algedonic] Escalating pain to ${parentId}: ${signal.message}`);
 
+    const parentScope = at(paths.hub(parentId));
+    const spine = loadSpine(parentScope);
+    if (spine) {
+      spine.alarm.currentLoad += signal.severity * 10;
+      spine.alarm.overflow = Math.max(0, spine.alarm.currentLoad - spine.alarm.capacity);
+      spine.alarm.lastFired = Date.now();
+      saveSpine(parentScope, spine);
+    }
+
     await getChain().append('algedonic:pain', 'escalation', signal.subject, {
       severity: signal.severity,
       source: signal.source,
@@ -153,8 +189,18 @@ async function findParentHubs(hubId: string): Promise<string[]> {
 
 export async function acknowledgePain(
   signalId: string,
-  acknowledgedBy: string
+  acknowledgedBy: string,
+  hubId?: string
 ): Promise<void> {
+  if (hubId) {
+    const hubScope = at(paths.hub(hubId));
+    const spine = loadSpine(hubScope);
+    if (spine) {
+      spine.alarm.currentLoad = Math.max(0, spine.alarm.currentLoad - 10);
+      saveSpine(hubScope, spine);
+    }
+  }
+
   await getChain().append('algedonic:acknowledged', acknowledgedBy, signalId, {
     acknowledgedAt: Date.now(),
   });
@@ -250,4 +296,25 @@ export async function getAllSignals(hubId?: string): Promise<AlgedonicSignal[]> 
   }
 
   return signals.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+// =============================================================================
+// ALARM PORT METRICS
+// =============================================================================
+
+export async function getAlarmPortLoad(hubId: string): Promise<{
+  currentLoad: number;
+  capacity: number;
+  overflow: number;
+}> {
+  const hubScope = at(paths.hub(hubId));
+  const spine = loadSpine(hubScope);
+  if (!spine) {
+    return { currentLoad: 0, capacity: 1000, overflow: 0 };
+  }
+  return {
+    currentLoad: spine.alarm.currentLoad,
+    capacity: spine.alarm.capacity,
+    overflow: spine.alarm.overflow,
+  };
 }

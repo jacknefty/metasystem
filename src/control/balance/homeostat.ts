@@ -1,13 +1,15 @@
 /**
- * Homeostat — S3/S4 Balance (Dynamics-Driven)
+ * Homeostat — Control/Intelligence Balance (Dynamics-Driven)
  *
- * F > invocationThreshold → invoke workers (S3 action)
- * F < perceptionThreshold → invoke perception (S4 action)
+ * F > invocationThreshold → invoke workers (Control action)
+ * F < perceptionThreshold → invoke perception (Intelligence action)
  * Otherwise → equilibrium
  *
  * Uses the unified dynamics module to compute free energy (F),
  * epistemic uncertainty (H), and expected free energy (G = F + γH)
  * for sophisticated control with learning.
+ *
+ * Balance port exposes Control/Intelligence tension to spine for variety tracking.
  *
  * Each node can have its own dynamics parameters (thresholds, γ, β),
  * allowing different "personalities": scouts scan eagerly, workers execute.
@@ -18,6 +20,8 @@ import { claimWork } from '../../coordination/resources/work.js';
 import { listNodes, DEFAULT_SETTINGS, type DerivedNode } from '../../identity/node.js';
 import { findClaimableWork, type PooledWork } from '../../coordination/resources/pool.js';
 import { perceiveEnvironment } from '../../intelligence/perceive/scan.js';
+import { loadSpine, saveSpine, sumOverflow, sumCapacity, type ControlIntelligenceTension } from '../../identity/spine.js';
+import { dao } from '../../identity/scoped-paths.js';
 
 export interface InvocationResult {
   invoked: string[];
@@ -143,6 +147,7 @@ function selectBestWork(pool: PooledWork[], params: DynamicsParameters = DEFAULT
  *
  * Uses the unified dynamics module to compute free energy
  * and select actions based on expected free energy minimization.
+ * Updates balance port with Control/Intelligence tension state.
  */
 export async function runDynamicsControlTick(): Promise<{
   F: number;
@@ -155,6 +160,9 @@ export async function runDynamicsControlTick(): Promise<{
 }> {
   // Network-level dynamics check (uses default params)
   const dynamics = await runDynamicsHomeostat();
+
+  // Update balance port with Control/Intelligence tension
+  updateBalancePort(dynamics.F, dynamics.action);
 
   if (dynamics.action === 'invoke') {
     // Node-level invocation respects per-node thresholds
@@ -169,4 +177,38 @@ export async function runDynamicsControlTick(): Promise<{
   }
 
   return dynamics;
+}
+
+/**
+ * Update the balance port with Control/Intelligence tension state.
+ * Exposes homeostat decision to spine for variety tracking.
+ */
+function updateBalancePort(
+  F: number,
+  action: 'invoke' | 'perceive' | 'equilibrium'
+): void {
+  const spine = loadSpine(dao);
+  if (!spine) return;
+
+  const totalCapacity = sumCapacity(spine);
+  const totalOverflow = sumOverflow(spine);
+
+  // Compute Control/Intelligence priorities from current state
+  // Control priority high when F high (need to resolve)
+  // Intelligence priority high when F low (room to perceive)
+  const controlPriority = totalCapacity > 0 ? F / totalCapacity : 0;
+  const intelligencePriority = totalCapacity > 0 ? Math.max(0, 1 - controlPriority) : 0;
+
+  const tension: ControlIntelligenceTension = {
+    controlPriority: Math.min(1, controlPriority),
+    intelligencePriority: Math.min(1, intelligencePriority),
+    resolution: action === 'invoke' ? 'control' : action === 'perceive' ? 'intelligence' : 'balanced',
+  };
+
+  // Update balance port state
+  spine.balance.currentLoad = totalOverflow;
+  spine.balance.overflow = Math.max(0, spine.balance.currentLoad - spine.balance.capacity);
+  spine.balance.lastFired = Date.now();
+
+  saveSpine(dao, spine);
 }

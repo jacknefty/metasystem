@@ -81,7 +81,7 @@ export const SOFTWARE_ARCHETYPES: Record<string, Archetype> = {
   'worker-service': {
     id: 'worker-service',
     name: 'Worker Service',
-    vsmRole: 'S1:operations',
+    vsmRole: 'operations',
     signals: {
       files: ['src/worker.ts', 'src/workers/*'],
       dependencies: ['bullmq', 'amqplib', 'kafka-node'],
@@ -94,7 +94,7 @@ export const SOFTWARE_ARCHETYPES: Record<string, Archetype> = {
   'queue-system': {
     id: 'queue-system',
     name: 'Queue System',
-    vsmRole: 'S2:coordination',
+    vsmRole: 'coordination',
     signals: {
       files: ['src/queue/*', 'src/broker/*'],
       dependencies: ['bullmq', 'amqplib', 'redis'],
@@ -107,7 +107,7 @@ export const SOFTWARE_ARCHETYPES: Record<string, Archetype> = {
   'auth-service': {
     id: 'auth-service',
     name: 'Auth Service',
-    vsmRole: 'S3:control',
+    vsmRole: 'control',
     signals: {
       files: ['src/auth/*', 'src/middleware/auth.*'],
       dependencies: ['passport', 'jsonwebtoken', 'bcrypt'],
@@ -120,7 +120,7 @@ export const SOFTWARE_ARCHETYPES: Record<string, Archetype> = {
   'test-suite': {
     id: 'test-suite',
     name: 'Test Suite',
-    vsmRole: 'S3*:audit',
+    vsmRole: 'audit',
     signals: {
       files: ['test/*', 'tests/*', '*.test.ts', '*.spec.ts'],
       dependencies: ['jest', 'vitest', 'mocha', 'playwright'],
@@ -133,7 +133,7 @@ export const SOFTWARE_ARCHETYPES: Record<string, Archetype> = {
   'monitoring': {
     id: 'monitoring',
     name: 'Monitoring',
-    vsmRole: 'S3*:audit',
+    vsmRole: 'audit',
     signals: {
       files: ['src/metrics/*', 'src/telemetry/*'],
       dependencies: ['prom-client', 'opentelemetry'],
@@ -146,7 +146,7 @@ export const SOFTWARE_ARCHETYPES: Record<string, Archetype> = {
   'analytics': {
     id: 'analytics',
     name: 'Analytics',
-    vsmRole: 'S4:intelligence',
+    vsmRole: 'intelligence',
     signals: {
       files: ['src/analytics/*', 'src/tracking/*'],
       dependencies: ['segment', 'mixpanel', 'amplitude'],
@@ -159,7 +159,7 @@ export const SOFTWARE_ARCHETYPES: Record<string, Archetype> = {
   'schema-registry': {
     id: 'schema-registry',
     name: 'Schema Registry',
-    vsmRole: 'S5:identity',
+    vsmRole: 'identity',
     signals: {
       files: ['schemas/*', 'src/schemas/*', '*.schema.json'],
       dependencies: ['zod', 'yup', 'ajv'],

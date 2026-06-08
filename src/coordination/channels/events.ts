@@ -128,15 +128,41 @@ export type EventType =
   | 'delegation:created'
   | 'delegation:revoked'
   | 'identity:amended'
-  // Verification (S3)
+  // Verification (Control)
   | 'verify:completion'
-  // Audit (S3*)
+  // Audit (sporadic)
+  | 'audit:triggered'
   | 'audit:node'
   | 'audit:hub'
   | 'audit:dao'
   // Identity Root Sync
   | 'identity:root:changed'
-  | 'identity:root:committed';
+  | 'identity:root:committed'
+  // Bargain (resource negotiation)
+  | 'bargain:requested'
+  | 'bargain:responded'
+  | 'bargain:finalized'
+  // Accountability (periodic reports)
+  | 'report:submitted'
+  // Policy (Identity updates)
+  | 'policy:updated'
+  | 'policy:received'
+  // Identity Drift
+  | 'identity:drift:detected'
+  // Escalation
+  | 'escalation:triggered'
+  | 'escalation:resolved'
+  // Children management
+  | 'child:spawned'
+  | 'intervention:applied'
+  | 'policy:pushed'
+  // Lateral coordination
+  | 'sibling:received'
+  | 'coordinate:signal'
+  | 'resource:locked'
+  | 'resource:released'
+  | 'dependency:connected'
+  | 'dependency:disconnected';
 
 export interface Condition {
   id: string;
@@ -263,6 +289,7 @@ export interface EventPayloads {
     context?: string;      // descriptive label
     hubId?: string;        // hub scope identifier
     daoAddress?: string;   // DAO scope identifier
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'variety:work:out': {
@@ -272,6 +299,7 @@ export interface EventPayloads {
     context?: string;
     hubId?: string;
     daoAddress?: string;
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'variety:env:in': {
@@ -279,6 +307,7 @@ export interface EventPayloads {
     context?: string;
     hubId?: string;
     daoAddress?: string;
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'variety:env:out': {
@@ -286,6 +315,7 @@ export interface EventPayloads {
     context?: string;
     hubId?: string;
     daoAddress?: string;
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'variety:coord:in': {
@@ -293,6 +323,7 @@ export interface EventPayloads {
     context?: string;
     hubId?: string;
     daoAddress?: string;
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'variety:coord:out': {
@@ -300,6 +331,7 @@ export interface EventPayloads {
     context?: string;
     hubId?: string;
     daoAddress?: string;
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'variety:identity:in': {
@@ -307,6 +339,7 @@ export interface EventPayloads {
     context?: string;
     hubId?: string;
     daoAddress?: string;
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'variety:identity:out': {
@@ -314,6 +347,7 @@ export interface EventPayloads {
     context?: string;
     hubId?: string;
     daoAddress?: string;
+    scopePath?: string;    // Scale-free: enables spine port routing
   };
 
   'credit:earned': {
@@ -573,10 +607,11 @@ export interface EventPayloads {
   };
 
   'learning:pattern': {
-    patternType: 'verifier-accuracy' | 'executor-performance' | 'condition-difficulty';
-    key: string;
-    value: number;
-    sampleSize: number;
+    patternType: 'verifier-accuracy' | 'executor-performance' | 'condition-difficulty' | 'capacity_reallocation';
+    key?: string;
+    value?: number;
+    sampleSize?: number;
+    pattern?: Record<string, unknown>;
   };
 
   'scope:acquired': {
@@ -762,7 +797,7 @@ export interface EventPayloads {
 
   'identity:amended': Record<string, unknown>;
 
-  // Verification (S3)
+  // Verification (Control)
   'verify:completion': {
     workId: string;
     nodeId: string;
@@ -771,7 +806,17 @@ export interface EventPayloads {
     passed: boolean;
   };
 
-  // Audit (S3*)
+  // Audit (sporadic)
+  'audit:triggered': {
+    probeType?: 'verify' | 'sample' | 'full' | 'spine' | 'circulatory' | 'informational' | 'recursion' | 'closure' | 'identity';
+    randomSeed?: number;
+    triggeredAt: number;
+    healthy?: boolean;
+    findingCount?: number;
+    scopeId?: string;
+    manual?: boolean;
+  };
+
   'audit:node': {
     nodeId: string;
     workId: string;
@@ -813,6 +858,156 @@ export interface EventPayloads {
     root: string;
     txHash: string;
     committedAt: number;
+  };
+
+  // Bargain (resource negotiation)
+  'bargain:requested': {
+    negotiationId: string;
+    resources: {
+      variety?: number;
+      capacity?: number;
+      time?: number;
+      scope?: string[];
+      budget?: number;
+    };
+    justification: string;
+  };
+
+  'bargain:responded': {
+    negotiationId: string;
+    direction: 'offer' | 'counter' | 'accept' | 'reject';
+    resources?: {
+      variety?: number;
+      capacity?: number;
+      time?: number;
+      scope?: string[];
+      budget?: number;
+    };
+    conditions?: string[];
+  };
+
+  'bargain:finalized': {
+    negotiationId: string;
+    accepted: boolean;
+    finalResources?: {
+      variety?: number;
+      capacity?: number;
+      time?: number;
+      scope?: string[];
+      budget?: number;
+    };
+  };
+
+  // Accountability (periodic reports)
+  'report:submitted': {
+    report: {
+      period: { start: number; end: number };
+      varietyIn: number;
+      varietyOut: number;
+      F: number;
+      anomalies: string[];
+    };
+    scopeId: string;
+  };
+
+  // Policy (Identity updates)
+  'policy:updated': {
+    changeType: string;
+    payload: Record<string, unknown>;
+    reason: string;
+  };
+
+  'policy:received': {
+    changeType: string;
+    fromParent: string;
+  };
+
+  // Identity Drift
+  'identity:drift:detected': {
+    drift: number;
+    driftingFiles: string[];
+  };
+
+  // Escalation
+  'escalation:triggered': {
+    level: number;
+    variable: string;
+    threshold?: number;
+    currentValue?: number;
+  };
+
+  'escalation:resolved': {
+    escalationId: string;
+    resolvedBy?: string;
+    resolution?: string;
+  };
+
+  // Children management
+  'child:spawned': {
+    name: string;
+    purpose: string;
+    policy?: {
+      scopeConstraints?: string[];
+      resourceLimits?: { maxTokensPerDay?: number; maxConcurrentWork?: number };
+      securityMode?: string;
+      rules?: string[];
+    };
+  };
+
+  'intervention:applied': {
+    type: 'halt' | 'resume' | 'reallocate' | 'override';
+    reason: string;
+    params?: Record<string, unknown>;
+    appliedAt: number;
+  };
+
+  'policy:pushed': {
+    policy: {
+      scope: string[];
+      limits: { tokens: number; concurrent: number };
+      security: string;
+      rules: string[];
+      inheritedAt: number;
+    };
+    pushedAt: number;
+  };
+
+  // Lateral coordination
+  'sibling:received': {
+    type: 'capability' | 'data' | 'signal';
+    timestamp: number;
+  };
+
+  'coordinate:signal': {
+    signal: {
+      type: 'yield' | 'claim' | 'release' | 'query' | 'status';
+      resource?: string;
+      priority?: number;
+      reason?: string;
+    };
+    timestamp: number;
+  };
+
+  'resource:locked': {
+    path: string;
+    timestamp: number;
+  };
+
+  'resource:released': {
+    path: string;
+    timestamp: number;
+  };
+
+  'dependency:connected': {
+    dependencyId: string;
+    capability: string;
+    providerId: string;
+    timestamp: number;
+  };
+
+  'dependency:disconnected': {
+    dependencyId: string;
+    timestamp: number;
   };
 }
 

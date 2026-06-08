@@ -4,9 +4,9 @@
  * Amplitude, phase, velocity, quantum potential.
  */
 
-import type { Configuration, WaveFunction, Vector, S4Field } from './types.js';
+import type { Configuration, WaveFunction, Vector, IntelligenceField } from './types.js';
 
-export function computeAmplitude(q: Configuration, field: S4Field): number {
+export function computeAmplitude(q: Configuration, field: IntelligenceField): number {
   let R = 1.0;
 
   // Resource constraint — can't operate without budget
@@ -88,7 +88,7 @@ function distance(a: Configuration, b: Configuration): number {
   );
 }
 
-export function buildWaveFunction(field: S4Field, mass: number): WaveFunction {
+export function buildWaveFunction(field: IntelligenceField, mass: number): WaveFunction {
   const wave: WaveFunction = {
     amplitude: (q) => computeAmplitude(q, field),
     phase: (q) => computePhase(q, field.values),

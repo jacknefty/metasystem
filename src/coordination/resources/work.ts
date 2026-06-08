@@ -145,7 +145,7 @@ export async function claimWork(
     throw new Error(`Work ${workId} is already claimed by ${work.claim.nodeId}`);
   }
 
-  // S5 policy checks
+  // Identity policy checks
   const settings = await resolveContextSettings(nodeId);
 
   // Check autonomy level

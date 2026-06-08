@@ -5,7 +5,7 @@
  * - Contract: the agreement (problem, success metric, scope, constraints, assumptions, risks)
  * - Work Graph: the decomposition into epics/stories with variety and leverage scoring
  *
- * W- prefix for work items to avoid collision with VSM S1-S5.
+ * W- prefix for work items to avoid collision with VSM subsystem names.
  */
 
 export interface HandoffContract {

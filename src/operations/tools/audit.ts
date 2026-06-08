@@ -1,5 +1,5 @@
 /**
- * Tool Audit — S3* for tools
+ * Tool Audit — sporadic verification for tools
  *
  * Sporadic verification that tools are behaving correctly.
  * Uses known-good inputs to validate outputs haven't drifted.

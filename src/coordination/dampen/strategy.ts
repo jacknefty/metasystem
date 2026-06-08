@@ -1,5 +1,5 @@
 /**
- * S2 Strategy — Coupling analysis and phased execution planning
+ * Coordination Strategy — Coupling analysis and phased execution planning
  *
  * Analyzes file overlap between work items and creates phased execution
  * to prevent merge conflicts when running parallel agents.

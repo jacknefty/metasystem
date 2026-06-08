@@ -23,7 +23,7 @@ export interface WaveFunction {
   potential: (q: Configuration) => number;
 }
 
-export interface S4Field {
+export interface IntelligenceField {
   gaps: CapabilityGap[];
   opportunities: Opportunity[];
   threats: Threat[];

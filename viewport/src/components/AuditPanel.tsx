@@ -134,7 +134,7 @@ function AuditCard({
       >
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs uppercase" style={{ color: COLORS.text.muted }}>
-            Automated S3* Vote
+            Automated Audit Vote
           </span>
         </div>
 

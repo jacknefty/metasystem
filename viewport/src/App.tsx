@@ -3,9 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Topology } from './components/Topology';
-import { FocusPanel } from './components/FocusPanel';
 import { Onboarding } from './components/Onboarding';
 import { CubeMockups } from './components/CubeMockups';
 import { WalletConnect } from './components/WalletConnect';
@@ -16,7 +14,8 @@ export function App() {
   const [hasRoot, setHasRoot] = useState<boolean | null>(null);
 
   // Check for ?mockups query param
-  const showMockups = new URLSearchParams(window.location.search).has('mockups');
+  const params = new URLSearchParams(window.location.search);
+  const showMockups = params.has('mockups');
 
   useEffect(() => {
     if (!showMockups) {
@@ -63,7 +62,7 @@ export function App() {
     );
   }
 
-  // Has root — show topology
+  // Has root — show topology with integrated cube view
   return (
     <div className="bezel">
       <div className="viewport">
@@ -75,21 +74,11 @@ export function App() {
           <WalletConnect />
         </div>
 
-        <Topology onNodeSelect={handleNodeSelect} selectedNode={selectedNode} />
-
-        <AnimatePresence>
-          {selectedNode && (
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              style={{ position: 'absolute', inset: 0, zIndex: 30 }}
-            >
-              <FocusPanel nodeId={selectedNode} onClose={handleClosePanel} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <Topology
+          onNodeSelect={handleNodeSelect}
+          selectedNode={selectedNode}
+          onClosePanel={handleClosePanel}
+        />
       </div>
     </div>
   );

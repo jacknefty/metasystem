@@ -13,6 +13,9 @@ export * from './types.js';
 
 // Free Energy (F, H, G)
 export {
+  // Local F from spine overflow
+  getLocalFreeEnergy,
+  // Aggregate F (local + children) - primary metric
   getFreeEnergy,
   getFreeEnergyState,
   getExpectedFreeEnergy,
@@ -22,7 +25,7 @@ export {
   interpolateG,
   clearFreeEnergyCache,
   invalidateFreeEnergy,
-  // Fix 2: Aggregated F with local/children/total breakdown
+  // Aggregated F with local/children/total breakdown
   getFreeEnergyAggregate,
   clearAggregateCache,
   invalidateAggregateCache,
@@ -70,9 +73,9 @@ export {
   resetDynamicsState,
 } from './evolution.js';
 
-// S4 Field
+// Intelligence Field
 export {
-  buildS4Field,
+  buildIntelligenceField,
   getNearestGap,
   getBestOpportunity,
   getActiveThreats,

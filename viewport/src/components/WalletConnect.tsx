@@ -73,7 +73,7 @@ export function WalletConnect() {
         onClick={handleConnect}
         className="px-3 py-1.5 rounded text-sm font-medium"
         style={{
-          background: COLORS.s5.primary,
+          background: COLORS.identity.primary,
           color: COLORS.text.primary,
         }}
       >
@@ -212,7 +212,7 @@ export function WalletConnect() {
                 disabled={isPending || isConfirming || isSuccess}
                 className="flex-1 px-4 py-2 rounded text-sm font-medium"
                 style={{
-                  background: isPending || isConfirming ? COLORS.bg.elevated : COLORS.s5.primary,
+                  background: isPending || isConfirming ? COLORS.bg.elevated : COLORS.identity.primary,
                   color: COLORS.text.primary,
                   opacity: isPending || isConfirming ? 0.7 : 1,
                 }}

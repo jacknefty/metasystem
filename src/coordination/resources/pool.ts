@@ -1,5 +1,5 @@
 /**
- * Coordination — Pool, Claims, Reputation (S2)
+ * Coordination — Pool, Claims, Reputation
  *
  * Manages work distribution, claim rules, and reputation tracking.
  */

@@ -3,11 +3,19 @@
  *
  * Every scope (hub, epic, story, task, node) gets the same VSM structure.
  * This enables true scale-free recursion.
+ *
+ * Generates:
+ * - VSM folders (coordination, control, intelligence, operations, audit, bridge)
+ * - identity.md (Identity contract)
+ * - chain.jsonl (event log)
+ * - spine.json (port structure for channel binding)
  */
 
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { Condition } from '../coordination/channels/events.js';
+import { createSpine, getAllPorts, type ScopeType as SpineScopeType } from './spine.js';
+import { predictInitialCapacity } from '../intelligence/perceive/capacity.js';
 
 export type ScopeType = 'hub' | 'epic' | 'story' | 'task' | 'node';
 
@@ -48,6 +56,23 @@ export function scaffoldScope(scopePath: string, options: ScaffoldOptions): void
   const chainPath = join(scopePath, 'chain.jsonl');
   if (!existsSync(chainPath)) {
     writeFileSync(chainPath, '');
+  }
+
+  // Generate spine.json with port structure and learned capacity
+  const spinePath = join(scopePath, 'spine.json');
+  if (!existsSync(spinePath)) {
+    const spineType = (options.type === 'hub' ? 'hub' : options.type) as SpineScopeType;
+    const spine = createSpine(options.id, spineType);
+
+    // Apply learned capacity from Intelligence perception
+    const predictedCapacity = predictInitialCapacity(options.type);
+    if (predictedCapacity !== 1000) {
+      for (const port of getAllPorts(spine)) {
+        port.capacity = predictedCapacity;
+      }
+    }
+
+    writeFileSync(spinePath, JSON.stringify(spine, null, 2));
   }
 }
 

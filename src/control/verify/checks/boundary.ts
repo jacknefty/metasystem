@@ -1,5 +1,5 @@
 /**
- * Boundary Respect Check (S3)
+ * Boundary Respect Check (Control)
  *
  * Did the node violate its declared "will not" boundaries?
  * Uses heuristics — best effort, not exhaustive.

@@ -1,14 +1,18 @@
 /**
  * Token — Variety accounting and credit minting
  *
- * Tracks variety flow across all domains. When work collapses
+ * Tracks variety flow through spine ports. When work collapses
  * (resolution position >= 1.0), credits are minted.
+ *
+ * Variety flows through ports first, chain events emitted as audit trail.
  */
 
 import { createHash } from 'crypto';
 import { getChain } from '../channels/chain.js';
 import { getWork } from './work.js';
 import type { EventPayloads } from '../channels/events.js';
+import { loadSpine, saveSpine, measureVariety, type Port } from '../../identity/spine.js';
+import { at } from '../../identity/scoped-paths.js';
 
 export type VarietyDomain = 'work' | 'env' | 'coord' | 'identity';
 export type VarietyDirection = 'in' | 'out';
@@ -130,6 +134,12 @@ export async function emitVariety(
     scopePath?: string;    // full scope path for recursive F computation
   }
 ): Promise<VarietyToken> {
+  // Route through spine port if scopePath provided
+  if (opts?.scopePath) {
+    routeThroughPort(opts.scopePath, domain, direction, bits);
+  }
+
+  // Emit chain event as audit trail
   const eventType = buildEventType(domain, direction);
 
   const payload: Record<string, unknown> = { bits };
@@ -156,6 +166,45 @@ export async function emitVariety(
     daoAddress: opts?.daoAddress,
     timestamp: event.timestamp,
   };
+}
+
+/**
+ * Route variety flow through the appropriate spine port.
+ * Updates port load/overflow - spine becomes source of truth.
+ */
+function routeThroughPort(
+  scopePath: string,
+  domain: VarietyDomain,
+  direction: VarietyDirection,
+  bits: number
+): void {
+  const scope = at(scopePath);
+  const spine = loadSpine(scope);
+  if (!spine) return;
+
+  // Map domain+direction to port
+  let port: Port | null = null;
+
+  if (domain === 'env' && direction === 'in') {
+    port = spine.ingress;
+  } else if (domain === 'env' && direction === 'out') {
+    port = spine.scan; // Environment outflow goes through scan
+  } else if (domain === 'work' && direction === 'in') {
+    port = spine.receive; // Work input from dependencies
+  } else if (domain === 'work' && direction === 'out') {
+    port = spine.egress;
+  } else if (domain === 'coord' && direction === 'in') {
+    port = spine.coordinate;
+  } else if (domain === 'coord' && direction === 'out') {
+    port = spine.coordinate;
+  }
+
+  if (port) {
+    port.currentLoad += bits;
+    port.overflow = Math.max(0, port.currentLoad - port.capacity);
+    port.lastFired = Date.now();
+    saveSpine(scope, spine);
+  }
 }
 
 export async function queryTokens(filter?: {

@@ -1,8 +1,8 @@
 /**
- * S2 Housekeeping
+ * Coordination Housekeeping
  *
  * Detects starvation and hoarding. Runs on work state change events.
- * Triggers sporadic S3* audits at each recursion level.
+ * Triggers sporadic audits at each recursion level.
  */
 
 import { listWork } from '../../coordination/resources/work.js';
@@ -157,7 +157,7 @@ async function maybeRunSporadicAudits(): Promise<void> {
         const node = nodes[Math.floor(Math.random() * nodes.length)];
         const result = await auditOwnWork(node.id);
         if (result?.drift) {
-          console.log(`[S3*] Node self-audit drift: ${node.id}`);
+          console.log(`[Audit] Node self-audit drift: ${node.id}`);
         }
       }
     }
@@ -168,7 +168,7 @@ async function maybeRunSporadicAudits(): Promise<void> {
         const hub = hubs[Math.floor(Math.random() * hubs.length)];
         const result = await auditNodeVerification(hub.frontmatter.id);
         if (result?.drift) {
-          console.log(`[S3*] Hub audit drift: ${hub.frontmatter.id}`);
+          console.log(`[Audit] Hub audit drift: ${hub.frontmatter.id}`);
         }
       }
     }
@@ -176,10 +176,10 @@ async function maybeRunSporadicAudits(): Promise<void> {
     if (Math.random() < 0.02) {
       const result = await auditContextAudit('dao');
       if (result?.drift) {
-        console.log(`[S3*] DAO audit drift: ${result.hubId}`);
+        console.log(`[Audit] DAO audit drift: ${result.hubId}`);
       }
     }
   } catch (err) {
-    console.error('[S3*] Sporadic audit error:', err);
+    console.error('[Audit] Sporadic audit error:', err);
   }
 }

@@ -81,3 +81,19 @@ export type {
   WorkStatus,
   BountyStatus,
 } from './derive.js';
+
+// Bargain (resource negotiation)
+export {
+  requestResources,
+  respondToRequest,
+  respondToOffer,
+  getNegotiation,
+  getPendingNegotiations,
+  getAllNegotiations,
+  expireNegotiations,
+  type NegotiationDirection,
+  type ResourceBundle,
+  type Negotiation,
+  type NegotiationRound,
+  type NegotiationResult,
+} from './bargain.js';

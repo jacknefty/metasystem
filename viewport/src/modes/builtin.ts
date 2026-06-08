@@ -61,7 +61,7 @@ Suggest measurable improvements with estimated impact.`,
 - Suggest resources for further learning
 
 Assume the user wants to understand, not just get an answer.`,
-    appliesTo: ['project', 'member', 's5'],
+    appliesTo: ['project', 'member', 'identity'],
     color: '#8b5cf6',
   },
 
@@ -76,7 +76,7 @@ Assume the user wants to understand, not just get an answer.`,
 - Skip pleasantries
 
 Direct and terse. The user values their time.`,
-    appliesTo: ['project', 'member', 's5'],
+    appliesTo: ['project', 'member', 'identity'],
     color: '#6b7280',
   },
 
@@ -92,7 +92,7 @@ Direct and terse. The user values their time.`,
 - Trade-off analysis
 
 Think in terms of modules, contracts, and seams. Suggest before implementing.`,
-    appliesTo: ['project', 's5'],
+    appliesTo: ['project', 'identity'],
     color: '#3b82f6',
   },
 
@@ -108,7 +108,7 @@ Think in terms of modules, contracts, and seams. Suggest before implementing.`,
 - Play the skeptic, not the cheerleader
 
 Push back constructively. Help find blind spots.`,
-    appliesTo: ['project', 'member', 's5'],
+    appliesTo: ['project', 'member', 'identity'],
     color: '#dc2626',
   },
 

@@ -79,3 +79,63 @@ export function scopeKey(scope: ScopedPaths): string {
   return scope.root();
 }
 
+export function getParentPath(scopePath: string): string | null {
+  const scope = at(scopePath);
+  const p = parent(scope);
+  return p ? p.root() : null;
+}
+
+/**
+ * Check if childPath is a direct child of parentPath (one level down)
+ */
+function isDirectChild(parentPath: string, childPath: string): boolean {
+  if (!childPath.startsWith(parentPath)) return false;
+  const remainder = childPath.slice(parentPath.length).replace(/^\//, '');
+  const segments = remainder.split('/').filter(Boolean);
+  return segments.length === 2;
+}
+
+/**
+ * List child scopes by querying chain events.
+ * Moved from free-energy.ts for broader use.
+ */
+export async function listChildren(scope: ScopedPaths): Promise<ScopedPaths[]> {
+  const { getChain } = await import('../coordination/channels/chain.js');
+  const scopePath = scope.root();
+
+  const events = await getChain().recall({
+    type: [
+      'hub:created',
+      'epic:created',
+      'story:created',
+      'task:created',
+      'identity:created',
+      'work:created',
+    ],
+  });
+
+  const children: ScopedPaths[] = [];
+
+  for (const event of events) {
+    const payload = event.payload as {
+      scopePath?: string;
+      parentPath?: string;
+      contextPath?: string;
+      hubId?: string;
+    };
+
+    const eventPath = payload.scopePath || payload.contextPath;
+    const parentPath = payload.parentPath;
+
+    if (parentPath === scopePath) {
+      if (eventPath) {
+        children.push(at(eventPath));
+      }
+    } else if (eventPath && isDirectChild(scopePath, eventPath)) {
+      children.push(at(eventPath));
+    }
+  }
+
+  return children;
+}
+

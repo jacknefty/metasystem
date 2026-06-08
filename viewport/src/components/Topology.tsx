@@ -1,8 +1,8 @@
 /**
  * Topology — Two-level recursive map view
  *
- * Local level: User S5 at center with agent/project S1s packed around it
- * Network level: Zoom out to see local S5 as S1 of MetasystemDAO
+ * Local level: User Identity at center with agent/project Operations packed around it
+ * Network level: Zoom out to see local Identity as Operations of MetasystemDAO
  *
  * Continuous zoom transition between levels.
  */
@@ -13,6 +13,7 @@ import { NodeBox } from './NodeBox';
 import { CreateModal } from './CreateModal';
 import { CreateDAOModal } from './CreateDAOModal';
 import { Starfield, type StarfieldHandle } from './Starfield';
+import { Cube } from './Cube';
 import { COLORS, LAYOUT, type NodeRole } from '../design-system';
 import { fetchWorkspaceRoot, fetchMembers, fetchNetworkTopology, fetchNetworkStatus, fetchNetworkMember, type Identity, type NetworkDAO, type NetworkMemberInfo } from '../api/client';
 import { subscribe } from '../api/events';
@@ -29,10 +30,11 @@ interface TopologyNode {
 interface TopologyProps {
   onNodeSelect: (nodeId: string | null) => void;
   selectedNode: string | null;
+  onClosePanel?: () => void;
 }
 
 /**
- * Circle packing for S1s around S5.
+ * Circle packing for Operations around Identity.
  *
  * Evenly distributes nodes in concentric rings.
  * Scale-free: works for 1 node or 1000 nodes.
@@ -79,7 +81,7 @@ function packNodesInRings(
 
 // Network level data is now fetched from contracts
 
-export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
+export function Topology({ onNodeSelect, selectedNode, onClosePanel }: TopologyProps) {
   const [zoom, setZoom] = useState<number>(1);
   const [nodes, setNodes] = useState<TopologyNode[]>([]);
   const [rootId, setRootId] = useState<string | null>(null);
@@ -153,7 +155,7 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
       // Build node list
       const nodeList: TopologyNode[] = [];
 
-      // Root S5 at center (green)
+      // Root Identity at center (green)
       nodeList.push({
         id: root.id,
         name: root.name,
@@ -162,19 +164,19 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
         y: centerY,
       });
 
-      // S1s (members) in packed rings
-      // Color depends on whether they have members (project=gold) or not (s1=orange)
+      // Operations (members) in packed rings
+      // Color depends on whether they have members (project=gold) or not (operations=orange)
       const positions = packNodesInRings(
         activeMembers.length,
         centerX,
         centerY,
-        LAYOUT.s1Radius,
+        LAYOUT.operationsRadius,
         90
       );
 
       activeMembers.forEach((member: Identity, i: number) => {
         const hasMembers = (member.memberCount || 0) > 0;
-        const role = hasMembers ? 'local-project' : 'local-s1';
+        const role = hasMembers ? 'local-hub' : 'local-operations';
         console.log(`[Topology] ${member.name}: memberCount=${member.memberCount}, hasMembers=${hasMembers}, role=${role}`);
         nodeList.push({
           id: member.id,
@@ -239,11 +241,11 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
       }
       // Track algedonic state from events directly
       if (event.type === 'algedonic:pain') {
-        const payload = event.payload as { projectId?: string; workId?: string };
+        const payload = event.payload as { hubId?: string; workId?: string };
         setAlgedonicNodes(prev => {
           const next = new Set(prev);
           next.add(event.subject);
-          if (payload.projectId) next.add(payload.projectId);
+          if (payload.hubId) next.add(payload.hubId);
           return next;
         });
         // Auto-clear after 60s
@@ -251,7 +253,7 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
           setAlgedonicNodes(prev => {
             const next = new Set(prev);
             next.delete(event.subject);
-            if (payload.projectId) next.delete(payload.projectId);
+            if (payload.hubId) next.delete(payload.hubId);
             return next;
           });
         }, 60000);
@@ -319,32 +321,32 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
   };
 
   // Separate render lists for different layers
-  const { localS1s, networkS1s, localS5Node, networkS5Node } = useMemo(() => {
-    if (!rootId) return { localS1s: [], networkS1s: [], localS5Node: null, networkS5Node: null };
+  const { localOperationsNodes, networkOperationsNodes, localIdentityNode, networkIdentityNode } = useMemo(() => {
+    if (!rootId) return { localOperationsNodes: [], networkOperationsNodes: [], localIdentityNode: null, networkIdentityNode: null };
 
     const centerX = viewportSize.width / 2;
     const centerY = viewportSize.height / 2;
 
-    // Local S1s (fade out as we approach network level)
-    const localS1Opacity = Math.max(0, 1 - transitionT * 2);
-    const localS1s = nodes.slice(1).map((node) => ({
+    // Local Operations (fade out as we approach network level)
+    const localOpacity = Math.max(0, 1 - transitionT * 2);
+    const localOperationsNodes = nodes.slice(1).map((node) => ({
       ...node,
-      opacity: localS1Opacity,
+      opacity: localOpacity,
       scale: 1,
     }));
 
-    // Network S1s (DAOs + other members orbit around MetasystemDAO S5)
-    const orbitRadius = LAYOUT.s1Radius;
-    const networkS1Opacity = Math.max(0, (transitionT - 0.3) / 0.7);
+    // Network Operations (DAOs + other members orbit around MetasystemDAO Identity)
+    const orbitRadius = LAYOUT.operationsRadius;
+    const networkOpacity = Math.max(0, (transitionT - 0.3) / 0.7);
     // Scale: starts large (2.0) when first appearing, shrinks to 1.2 at full zoom-out
-    const networkS1Scale = 2.0 - transitionT * 0.8;
+    const networkScale = 2.0 - transitionT * 0.8;
 
     // MetasystemDAO starts above center, pans down to center
     const metasystemStartY = centerY - orbitRadius;
     const panOffsetY = panProgress * (centerY - metasystemStartY);
     const metasystemCurrentY = metasystemStartY + panOffsetY;
 
-    // Build unified list of all S1s at network level:
+    // Build unified list of all Operations at network level:
     // - DAOs (projects)
     // - Other members (excluding current user who stays in special position)
     const currentUserAddrLower = currentUserAddress?.toLowerCase();
@@ -354,66 +356,66 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
 
     // Combine DAOs and other members into one orbit
     // DAOs have members → network-project (indigo)
-    // Plain members → network-s1 (cyan)
-    const allNetworkS1s: Array<{ id: string; name: string; role: NodeRole }> = [
-      ...networkDAOs.map(dao => ({ id: dao.address, name: dao.name, role: 'network-project' as NodeRole })),
+    // Plain members → network-operations (cyan)
+    const allNetworkOps: Array<{ id: string; name: string; role: NodeRole }> = [
+      ...networkDAOs.map(dao => ({ id: dao.address, name: dao.name, role: 'network-hub' as NodeRole })),
       ...otherMembers.map(m => ({
         id: m.address,
         name: `${m.address.slice(0, 6)}...${m.address.slice(-4)}`,
-        role: 'network-s1' as NodeRole
+        role: 'network-operations' as NodeRole
       })),
     ];
 
-    // All S1s orbit around MetasystemDAO's current position
-    const networkS1Positions = packNodesInRings(
-      allNetworkS1s.length,
+    // All Operations orbit around MetasystemDAO's current position
+    const networkOpsPositions = packNodesInRings(
+      allNetworkOps.length,
       centerX,
       metasystemCurrentY,
       orbitRadius,
       90
     );
 
-    const networkS1s = allNetworkS1s.map((node, i) => ({
+    const networkOperationsNodes = allNetworkOps.map((node, i) => ({
       id: node.id,
       name: node.name,
       role: node.role,
-      x: networkS1Positions[i]?.x || centerX + orbitRadius,
-      y: networkS1Positions[i]?.y || metasystemCurrentY,
-      opacity: networkS1Opacity,
-      scale: networkS1Scale,
+      x: networkOpsPositions[i]?.x || centerX + orbitRadius,
+      y: networkOpsPositions[i]?.y || metasystemCurrentY,
+      opacity: networkOpacity,
+      scale: networkScale,
     }));
 
-    // Local S5 (current user) - stays below MetasystemDAO at network level
-    // At network level, local root becomes network-s1 (cyan) - it's just a member of MetasystemDAO
+    // Local Identity (current user) - stays below MetasystemDAO at network level
+    // At network level, local root becomes network-operations (cyan) - it's just a member of MetasystemDAO
     // (its local members don't count as network-level sub-DAOs)
     // At local level: stays as local-root (green)
-    const localS5 = nodes[0];
+    const localIdentity = nodes[0];
     const showAtNetworkLevel = transitionT > 0.5 && isConnected && isVerifiedMember;
-    const userRole = showAtNetworkLevel ? 'network-s1' : 'local-root';
+    const userRole = showAtNetworkLevel ? 'network-operations' : 'local-root';
 
-    // At network level, hide local S5 if not a verified member
-    const localS5Opacity = transitionT > 0.5 && !isVerifiedMember ? 0 : 1;
+    // At network level, hide local Identity if not a verified member
+    const localIdentityOpacity = transitionT > 0.5 && !isVerifiedMember ? 0 : 1;
 
-    const localS5Node = localS5 ? {
-      ...localS5,
+    const localIdentityNode = localIdentity ? {
+      ...localIdentity,
       role: userRole as NodeRole,
-      opacity: localS5Opacity,
+      opacity: localIdentityOpacity,
       y: centerY + panOffsetY, // Below MetasystemDAO
     } : null;
 
-    // Network S5 (MetasystemDAO) - violet
-    const networkS5Opacity = Math.max(0, (transitionT - 0.2) / 0.8);
-    const networkS5Node = {
+    // Network Identity (MetasystemDAO) - violet
+    const networkIdentityOpacity = Math.max(0, (transitionT - 0.2) / 0.8);
+    const networkIdentityNode = {
       id: 'metasystem-dao',
       name: 'MetasystemDAO',
-      role: 'network-s5' as NodeRole,
+      role: 'network-identity' as NodeRole,
       x: centerX,
       y: metasystemCurrentY,
-      opacity: networkS5Opacity,
-      scale: networkS1Scale,
+      opacity: networkIdentityOpacity,
+      scale: networkScale,
     };
 
-    return { localS1s, networkS1s, localS5Node, networkS5Node };
+    return { localOperationsNodes, networkOperationsNodes, localIdentityNode, networkIdentityNode };
   }, [nodes, rootId, transitionT, viewportSize, panProgress, networkDAOs, networkMembers, currentUserAddress, isConnected, isVerifiedMember]);
 
   // Trigger hyperdrive on work completed events
@@ -491,7 +493,7 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
         </button>
       </div>
 
-      {/* Local S1s layer - zooms out */}
+      {/* Local Operations layer - zooms out */}
       <motion.div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -502,7 +504,7 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
       >
         {!loading && nodes.length > 0 && (
           <>
-            {localS1s.map((node) => (
+            {localOperationsNodes.map((node) => (
               <motion.div
                 key={`local-${node.id}`}
                 animate={{
@@ -531,11 +533,11 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
         )}
       </motion.div>
 
-      {/* Network S1s layer - fixed size, fades in */}
+      {/* Network Operations layer - fixed size, fades in */}
       <div className="absolute inset-0 pointer-events-none">
         {!loading && nodes.length > 0 && (
           <>
-            {networkS1s.map((node) => (
+            {networkOperationsNodes.map((node) => (
               <motion.div
                 key={`network-${node.id}`}
                 animate={{
@@ -564,7 +566,7 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
         )}
       </div>
 
-      {/* S5 layer - fixed size at center */}
+      {/* Identity layer - fixed size at center */}
       <div className="absolute inset-0 pointer-events-none">
         {loading ? (
           <div
@@ -583,56 +585,56 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
           </div>
         ) : (
           <>
-            {/* Local S5 / User - stays at center, pans down when DAO takes over */}
-            {localS5Node && (
+            {/* Local Identity / User - stays at center, pans down when DAO takes over */}
+            {localIdentityNode && (
               <motion.div
-                key={`s5-local-${localS5Node.id}`}
+                key={`identity-local-${localIdentityNode.id}`}
                 animate={{
-                  opacity: localS5Node.opacity,
-                  top: localS5Node.y,
+                  opacity: localIdentityNode.opacity,
+                  top: localIdentityNode.y,
                 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 style={{
                   position: 'absolute',
                   left: '50%',
                   transform: 'translate(-50%, -50%) scale(1.2)',
-                  pointerEvents: localS5Node.opacity > 0.1 ? 'auto' : 'none',
+                  pointerEvents: localIdentityNode.opacity > 0.1 ? 'auto' : 'none',
                 }}
               >
                 <NodeBox
-                  id={localS5Node.id}
-                  name={localS5Node.name}
-                  role={localS5Node.role}
-                  selected={selectedNode === localS5Node.id}
-                  hasAlgedonic={algedonicNodes.has(localS5Node.id)}
-                  onClick={() => onNodeSelect(localS5Node.id)}
+                  id={localIdentityNode.id}
+                  name={localIdentityNode.name}
+                  role={localIdentityNode.role}
+                  selected={selectedNode === localIdentityNode.id}
+                  hasAlgedonic={algedonicNodes.has(localIdentityNode.id)}
+                  onClick={() => onNodeSelect(localIdentityNode.id)}
                 />
               </motion.div>
             )}
 
-            {/* Network S5 (MetasystemDAO) - fades in from orbit */}
-            {networkS5Node && (
+            {/* Network Identity (MetasystemDAO) - fades in from orbit */}
+            {networkIdentityNode && (
               <motion.div
-                key={`s5-network-${networkS5Node.id}`}
+                key={`identity-network-${networkIdentityNode.id}`}
                 animate={{
-                  opacity: networkS5Node.opacity,
+                  opacity: networkIdentityNode.opacity,
                 }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
                 style={{
                   position: 'absolute',
-                  left: networkS5Node.x,
-                  top: networkS5Node.y,
-                  transform: `translate(-50%, -50%) scale(${networkS5Node.scale})`,
-                  pointerEvents: networkS5Node.opacity > 0.1 ? 'auto' : 'none',
+                  left: networkIdentityNode.x,
+                  top: networkIdentityNode.y,
+                  transform: `translate(-50%, -50%) scale(${networkIdentityNode.scale})`,
+                  pointerEvents: networkIdentityNode.opacity > 0.1 ? 'auto' : 'none',
                 }}
               >
                 <NodeBox
-                  id={networkS5Node.id}
-                  name={networkS5Node.name}
-                  role={networkS5Node.role}
-                  selected={selectedNode === networkS5Node.id}
-                  hasAlgedonic={algedonicNodes.has(networkS5Node.id)}
-                  onClick={() => onNodeSelect(networkS5Node.id)}
+                  id={networkIdentityNode.id}
+                  name={networkIdentityNode.name}
+                  role={networkIdentityNode.role}
+                  selected={selectedNode === networkIdentityNode.id}
+                  hasAlgedonic={algedonicNodes.has(networkIdentityNode.id)}
+                  onClick={() => onNodeSelect(networkIdentityNode.id)}
                 />
               </motion.div>
             )}
@@ -690,6 +692,23 @@ export function Topology({ onNodeSelect, selectedNode }: TopologyProps) {
             onClose={() => setShowCreateDAOModal(false)}
             onCreated={loadNetwork}
           />
+        )}
+      </AnimatePresence>
+
+      {/* 3D Cube — VSM Black Box */}
+      <AnimatePresence>
+        {selectedNode && (
+          <motion.div
+            key={`cube-${selectedNode}`}
+            initial={{ scale: 0.1, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.1, opacity: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 150 }}
+            className="absolute inset-0 pointer-events-auto"
+            style={{ zIndex: 25 }}
+          >
+            <Cube onClose={onClosePanel} viewportSize={viewportSize} scopeId={selectedNode} />
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

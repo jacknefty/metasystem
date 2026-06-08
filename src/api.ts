@@ -33,13 +33,25 @@ import { selfAssess } from './audit/assess.js';
 import { analyzeCoupling, getNextExecutableWork } from './coordination/dampen/strategy.js';
 import { checkFileInScope, filterFilesToScope, expandScope } from './coordination/dampen/scope.js';
 import { getChain } from './coordination/channels/chain.js';
-import { getBohmianState, getS4Field } from './intelligence/model/bohmian/index.js';
+import { getBohmianState, getIntelligenceField } from './intelligence/model/bohmian/index.js';
 import { perceiveEnvironment } from './intelligence/perceive/scan.js';
 import * as tools from './operations/tools/index.js';
 import { checkToolHealth } from './operations/tools/reliability.js';
 import { DEFAULT_PARAMETERS, type Scope } from './control/dynamics/types.js';
 import { DEFAULT_QUORUM, DEFAULT_VOTING_PERIOD } from './coordination/governance/types.js';
-import { dao, at } from './identity/scoped-paths.js';
+import { dao, at, listChildren } from './identity/scoped-paths.js';
+import { loadSpine, sumOverflow, getAllPorts } from './identity/spine.js';
+import {
+  attenuateForParent,
+  attenuateForViewport,
+  amplifyIntent,
+  buildGovernanceView,
+  attenuateEnvironment,
+  collectEnvironmentSignals,
+  type RawScopeState,
+  type Escalation,
+} from './transducers/index.js';
+import { generateOutlook } from './intelligence/model/recommend.js';
 
 const app = express();
 app.use(cors());
@@ -440,14 +452,14 @@ app.post('/api/algedonic/:id/acknowledge', wrap(async (req, res) => {
 
 // --- Chat Endpoints (for ChatPanel) ---
 app.post('/api/chat/product-mode', wrap(async (req, res) => {
-  const { projectId, message, sessionId } = req.body;
+  const { hubId, message, sessionId } = req.body;
 
-  if (!projectId || !message) {
-    res.status(400).json({ error: 'projectId and message required' });
+  if (!hubId || !message) {
+    res.status(400).json({ error: 'hubId and message required' });
     return;
   }
 
-  const node = await identity.getNode(projectId);
+  const node = await identity.getNode(hubId);
   if (!node) {
     res.status(404).json({ error: 'Node not found' });
     return;
@@ -455,11 +467,11 @@ app.post('/api/chat/product-mode', wrap(async (req, res) => {
 
   let session = sessionId
     ? pm.getSession(sessionId)
-    : pm.getSessionByContext(projectId);
+    : pm.getSessionByContext(hubId);
 
   if (!session) {
-    console.log('[API] Creating new PM session for', projectId);
-    session = pm.createSession(projectId);
+    console.log('[API] Creating new PM session for', hubId);
+    session = pm.createSession(hubId);
     console.log('[API] Created session:', session.id, session.phase);
   }
 
@@ -470,7 +482,7 @@ app.post('/api/chat/product-mode', wrap(async (req, res) => {
   switch (session.phase) {
     case 'perceiving':
     case 'shape_discovery':
-      response = await handlePMConversation(session, projectId, message);
+      response = await handlePMConversation(session, hubId, message);
       break;
 
     case 'analysis':
@@ -876,7 +888,7 @@ app.post('/api/work/:id/assess', wrap(async (req, res) => {
   res.json(result);
 }));
 
-// --- S3 Verification ---
+// --- Control Verification ---
 import { verifyCompletion } from './control/verify/completion.js';
 
 app.post('/api/verify/:workId', wrap(async (req, res) => {
@@ -885,7 +897,7 @@ app.post('/api/verify/:workId', wrap(async (req, res) => {
   res.json(result);
 }));
 
-// --- S3* Audit ---
+// --- Audit (sporadic) ---
 import { auditOwnWork } from './audit/node/audit.js';
 import { auditNodeVerification } from './audit/context/audit.js';
 import { auditContextAudit } from './audit/dao/audit.js';
@@ -1015,7 +1027,7 @@ app.get('/api/bohmian/state/:nodeId', wrap(async (req, res) => {
 }));
 
 app.get('/api/bohmian/field', wrap(async (req, res) => {
-  res.json(await getS4Field());
+  res.json(await getIntelligenceField());
 }));
 
 // --- Unified Dynamics (G = F + γH) ---
@@ -1042,7 +1054,7 @@ app.get('/api/dynamics/free-energy/aggregate', wrap(async (req, res) => {
 
 app.get('/api/dynamics/field', wrap(async (req, res) => {
   const scope = parseScope(req.query as Record<string, unknown>);
-  res.json(await dynamics.buildS4Field(scope));
+  res.json(await dynamics.buildIntelligenceField(scope));
 }));
 
 app.get('/api/dynamics/precision', wrap(async (req, res) => {
@@ -1823,9 +1835,9 @@ app.post('/api/settings/purge-terminated', wrap(async (req, res) => {
   });
 }));
 
-// --- Algedonic Project Filter ---
-app.get('/api/algedonic/project/:projectId', wrap(async (req, res) => {
-  const all = await algedonic.getAllSignals(str(req.params.projectId));
+// --- Algedonic Hub Filter ---
+app.get('/api/algedonic/hub/:hubId', wrap(async (req, res) => {
+  const all = await algedonic.getAllSignals(str(req.params.hubId));
   res.json(all);
 }));
 
@@ -2046,6 +2058,356 @@ app.get('/api/voting-power/:identity', wrap(async (req, res) => {
   res.json(power);
 }));
 
+// --- Transducer / Cube Endpoints ---
+
+function resolveScopePath(id: string): string {
+  // Handle special aliases
+  if (id === 'metasystem' || id === 'dao' || id === 'root') {
+    return dao.root();
+  }
+  // If it looks like a path, use it directly
+  if (id.startsWith('/')) {
+    return id;
+  }
+  // Otherwise treat as hub id
+  return paths.hub(id);
+}
+
+async function buildRawScopeState(scopePath: string): Promise<RawScopeState> {
+  const resolvedPath = resolveScopePath(scopePath);
+  const scope = at(resolvedPath);
+  const spine = loadSpine(scope);
+  const chain = getChain();
+
+  // Get recent events for this scope
+  const recentEvents = await chain.recall({
+    subject: resolvedPath,
+    limit: 50,
+  });
+
+  // Extract escalations from events
+  const escalations: Escalation[] = [];
+  for (const event of recentEvents) {
+    if (event.type === 'escalation:triggered') {
+      const payload = event.payload as { level?: number; variable?: string };
+      escalations.push({
+        id: event.id,
+        level: payload.level ?? 1,
+        variable: payload.variable ?? 'unknown',
+        triggeredAt: event.timestamp,
+        resolved: recentEvents.some(e =>
+          e.type === 'escalation:resolved' &&
+          (e.payload as { escalationId?: string }).escalationId === event.id
+        ),
+      });
+    }
+  }
+
+  // Get children
+  const children = await listChildren(scope);
+  const childStates: RawScopeState[] = [];
+
+  for (const child of children.slice(0, 10)) { // Limit to 10 children for performance
+    const childSpine = loadSpine(child);
+    if (childSpine) {
+      childStates.push({
+        scopeId: childSpine.scopeId,
+        scopePath: child.root(),
+        F: sumOverflow(childSpine),
+        ports: Object.fromEntries(getAllPorts(childSpine).map(p => [p.id, p])),
+        essentialVariables: childSpine.essentialVariables,
+        escalations: [],
+        children: [],
+        recentEvents: [],
+      });
+    }
+  }
+
+  const ports = spine ? Object.fromEntries(getAllPorts(spine).map(p => [p.id, p])) : {};
+
+  return {
+    scopeId: spine?.scopeId ?? resolvedPath,
+    scopePath: resolvedPath,
+    F: spine ? sumOverflow(spine) : 0,
+    ports,
+    essentialVariables: spine?.essentialVariables ?? [],
+    escalations,
+    children: childStates,
+    recentEvents,
+  };
+}
+
+// Intelligence Face: Parent view (attenuated report)
+app.get('/api/scope/:id/report', wrap(async (req, res) => {
+  const scopePath = str(req.params.id);
+  const state = await buildRawScopeState(scopePath);
+  const report = attenuateForParent(state);
+  res.json(report);
+}));
+
+// Operations Face: Human view (attenuated system state)
+app.get('/api/scope/:id/operations', wrap(async (req, res) => {
+  const scopePath = str(req.params.id);
+  const state = await buildRawScopeState(scopePath);
+  const operationsView = attenuateForViewport(state);
+  res.json(operationsView);
+}));
+
+// Operations Face: Human intent (amplified actions)
+app.post('/api/scope/:id/intent', wrap(async (req, res) => {
+  const scopePath = str(req.params.id);
+  const { raw, type } = req.body;
+
+  const actions = await amplifyIntent(
+    { raw: raw ?? '', type: type ?? 'chat' },
+    scopePath
+  );
+
+  // Execute the actions
+  for (const action of actions.actions) {
+    if (action.type === 'audit:trigger') {
+      await getChain().append('audit:triggered', 'human', scopePath, {
+        triggeredAt: Date.now(),
+        manual: true,
+      });
+    }
+    // Other action types would be handled here
+  }
+
+  res.json(actions);
+}));
+
+// Control Face: Children view
+app.get('/api/scope/:id/children', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+  const children = await listChildren(scope);
+
+  const summaries = [];
+  for (const child of children) {
+    const childIdentity = loadIdentity(child.identity());
+    const childSpine = loadSpine(child);
+    const F = childSpine ? sumOverflow(childSpine) : 0;
+
+    let status: 'healthy' | 'stressed' | 'critical' = 'healthy';
+    if (F > 40) status = 'critical';
+    else if (F > 15) status = 'stressed';
+
+    summaries.push({
+      id: childSpine?.scopeId ?? child.root(),
+      name: childIdentity?.frontmatter?.id ?? 'Unknown',
+      type: childIdentity?.frontmatter?.type ?? 'unknown',
+      status,
+      F,
+      progress: 0, // Would compute from closure conditions
+      pendingInterventions: [],
+    });
+  }
+
+  res.json(summaries);
+}));
+
+// Audit Face: Governance view (raw internal state)
+app.get('/api/scope/:id/governance', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+  const spine = loadSpine(scope);
+
+  if (!spine) {
+    res.status(404).json({ error: 'Spine not found', path: scopePath });
+    return;
+  }
+
+  const state = await buildRawScopeState(str(req.params.id));
+  const governance = buildGovernanceView(state, spine);
+  res.json(governance);
+}));
+
+// Environment signals (for scan transducer)
+app.get('/api/scope/:id/signals', wrap(async (req, res) => {
+  const raw = await collectEnvironmentSignals();
+  const signals = attenuateEnvironment(raw);
+  res.json(signals);
+}));
+
+// Intelligence: Outlook (future modeling)
+app.get('/api/scope/:id/outlook', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const outlook = await generateOutlook(scopePath);
+  res.json(outlook);
+}));
+
+// Audit Face: Raw spine state
+app.get('/api/scope/:id/spine', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+  const spine = loadSpine(scope);
+
+  if (!spine) {
+    res.status(404).json({ error: 'Spine not found', path: scopePath });
+    return;
+  }
+
+  res.json(spine);
+}));
+
+// Intelligence Face: Current bargain state
+app.get('/api/scope/:id/bargain', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+
+  const { getCurrentBargain, getActiveBargains } = await import('./transducers/bargain.js');
+  const current = await getCurrentBargain(scope);
+  const active = await getActiveBargains(scope);
+
+  res.json({
+    current,
+    active,
+    hasActive: active.length > 0,
+  });
+}));
+
+// Intelligence Face: Request resources from parent
+app.post('/api/scope/:id/bargain/request', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+  const { type, amount, scopeExpansion, justification, urgency } = req.body;
+
+  const { requestResources } = await import('./transducers/bargain.js');
+
+  try {
+    const state = await requestResources(scope, {
+      type: type ?? 'capacity',
+      amount,
+      scopeExpansion,
+      justification: justification ?? 'Resource request',
+      urgency: urgency ?? 'normal',
+    });
+    res.json({ ok: true, negotiation: state });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: String(err) });
+  }
+}));
+
+// Coordination Face: Scope capabilities
+app.get('/api/scope/:id/capabilities', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+
+  const { getCapabilities } = await import('./transducers/lateral.js');
+  const capabilities = await getCapabilities(scope);
+
+  res.json(capabilities);
+}));
+
+// Coordination Face: Update capabilities
+app.put('/api/scope/:id/capabilities', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+  const identityData = loadIdentity(scope.identity());
+
+  if (!identityData) {
+    res.status(404).json({ error: 'Identity not found' });
+    return;
+  }
+
+  const { capabilities } = req.body;
+  if (!Array.isArray(capabilities)) {
+    res.status(400).json({ error: 'capabilities must be an array' });
+    return;
+  }
+
+  // Update identity frontmatter with new capabilities
+  const identityPath = scope.identity();
+  const content = readFileSync(identityPath, 'utf-8');
+  const parts = content.split('---');
+
+  if (parts.length >= 3) {
+    const frontmatter = parts[1];
+    const body = parts.slice(2).join('---');
+
+    // Add or update capabilities field
+    let newFrontmatter: string;
+    if (frontmatter.includes('capabilities:')) {
+      newFrontmatter = frontmatter.replace(/capabilities:.*(?:\n  - .*)*/, `capabilities:\n${capabilities.map((c: string) => `  - ${c}`).join('\n')}`);
+    } else {
+      newFrontmatter = frontmatter.trim() + `\ncapabilities:\n${capabilities.map((c: string) => `  - ${c}`).join('\n')}\n`;
+    }
+
+    writeFileSync(identityPath, `---${newFrontmatter}---${body}`);
+  }
+
+  res.json({ ok: true, capabilities });
+}));
+
+// Identity Face: Dependencies on siblings
+app.get('/api/scope/:id/dependencies', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+
+  const { getDependencies } = await import('./transducers/lateral.js');
+  const dependencies = await getDependencies(scope);
+
+  res.json(dependencies);
+}));
+
+// Control Face: Intervene in child
+app.post('/api/scope/:id/intervene', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+  const { childId, action, reason, params } = req.body;
+
+  if (!childId || !action) {
+    res.status(400).json({ error: 'childId and action required' });
+    return;
+  }
+
+  const { interveneChild } = await import('./transducers/children.js');
+
+  try {
+    const result = await interveneChild(scope, childId, {
+      type: action,
+      reason: reason ?? 'Manual intervention',
+      params,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ ok: false, error: String(err) });
+  }
+}));
+
+// Coordination Face: Siblings discovery
+app.get('/api/scope/:id/siblings', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+
+  const { getSiblings } = await import('./transducers/lateral.js');
+  const siblings = await getSiblings(scope);
+
+  res.json(siblings);
+}));
+
+// Coordination Face: Connect to sibling capability
+app.post('/api/scope/:id/dependencies', wrap(async (req, res) => {
+  const scopePath = resolveScopePath(str(req.params.id));
+  const scope = at(scopePath);
+  const { providerId, capability } = req.body;
+
+  if (!providerId || !capability) {
+    res.status(400).json({ error: 'providerId and capability required' });
+    return;
+  }
+
+  const { connectToCapability } = await import('./transducers/lateral.js');
+
+  try {
+    const dependency = await connectToCapability(scope, providerId, capability);
+    res.json({ ok: true, dependency });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: String(err) });
+  }
+}));
+
 // Error handler
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   console.error('[API] Error:', err.message);
@@ -2058,4 +2420,9 @@ export function startServer(port: number = 3000): void {
   app.listen(port, () => {
     console.log(`[API] Server running on port ${port}`);
   });
+}
+
+// Auto-start when run directly
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('api.ts')) {
+  startServer();
 }

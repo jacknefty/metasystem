@@ -1,5 +1,5 @@
 /**
- * Operation — Public API (S1)
+ * Operations — Public API
  *
  * Work execution, worktrees, merge queue.
  */

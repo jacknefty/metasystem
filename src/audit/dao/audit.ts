@@ -1,5 +1,5 @@
 /**
- * DAO S3* (Sample Contexts)
+ * DAO Audit (Sample Contexts)
  *
  * Samples one context's audit. Re-runs the same verification.
  * Checks if context got it right.

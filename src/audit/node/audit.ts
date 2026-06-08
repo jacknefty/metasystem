@@ -1,5 +1,5 @@
 /**
- * Node S3* (Self-Audit)
+ * Node Self-Audit (sporadic)
  *
  * Sporadically re-verifies own past work.
  */

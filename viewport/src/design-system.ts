@@ -4,15 +4,15 @@
  * Two recursion levels with distinct color palettes:
  *
  * LOCAL LEVEL (within user's workspace):
- * - Root S5 (e.g., jack): Green
- * - Projects (S1s with members): Yellow/Gold
- * - S1s (no members): Orange
+ * - Root Identity (e.g., jack): Green
+ * - Hubs (Operations with members): Yellow/Gold
+ * - Operations (no members): Orange
  * - Algedonic signals: Red
  *
  * NETWORK LEVEL (MetasystemDAO):
- * - MetasystemDAO S5: Violet
- * - Projects (S1s with members): Indigo
- * - S1s (no members): Cyan
+ * - MetasystemDAO Identity: Violet
+ * - Hubs (Operations with members): Indigo
+ * - Operations (no members): Cyan
  *
  * All nodes are futuristic black boxes with colored accents.
  */
@@ -22,13 +22,13 @@
 // =============================================================================
 
 export type NodeRole =
-  | 'local-root'      // Root S5 at local level (green)
-  | 'local-project'   // S1 with members at local level (gold)
-  | 'local-s1'        // S1 without members at local level (orange)
-  | 'network-s5'      // MetasystemDAO S5 (violet)
-  | 'network-project' // S1 with members at network level (indigo)
-  | 'network-s1'      // S1 without members at network level (cyan)
-  | 'algedonic';      // Pain/pleasure signals (red)
+  | 'local-root'        // Root Identity at local level (green)
+  | 'local-hub'         // Hub (operations with members) at local level (gold)
+  | 'local-operations'  // Operations without members at local level (orange)
+  | 'network-identity'  // MetasystemDAO Identity (violet)
+  | 'network-hub'       // Hub (operations with members) at network level (indigo)
+  | 'network-operations'// Operations without members at network level (cyan)
+  | 'algedonic';        // Pain/pleasure signals (red)
 
 export type RecursionLevel = 'local' | 'network';
 
@@ -46,7 +46,18 @@ export const COLORS = {
     panel: '#141920',
   },
 
-  // LOCAL: Root S5 (green)
+  // Cyber/Tron accents
+  cyber: {
+    grid: '#1a2332',          // Subtle grid lines
+    gridGlow: '#2a3a4a',      // Active grid
+    line: '#00fff2',          // Tron cyan accent
+    lineSubtle: '#00fff230',  // Faded accent lines
+    pulse: '#00fff280',       // Pulsing glow
+    warning: '#ff6b00',       // Orange alert
+    danger: '#ff0055',        // Red critical
+  },
+
+  // LOCAL: Root Identity (green)
   localRoot: {
     primary: '#10b981',
     glow: '#34d399',
@@ -54,40 +65,40 @@ export const COLORS = {
     text: '#6ee7b7',
   },
 
-  // LOCAL: Projects - S1s with members (orange)
-  localProject: {
+  // LOCAL: Hubs - Operations with members (orange)
+  localHub: {
     primary: '#ea580c',
     glow: '#f97316',
     border: '#c2410c',
     text: '#fb923c',
   },
 
-  // LOCAL: S1s without members (bright yellow)
-  localS1: {
+  // LOCAL: Operations without members (bright yellow)
+  localOperations: {
     primary: '#facc15',
     glow: '#fde047',
     border: '#eab308',
     text: '#fef08a',
   },
 
-  // NETWORK: MetasystemDAO S5 (violet)
-  networkS5: {
+  // NETWORK: MetasystemDAO Identity (violet)
+  networkIdentity: {
     primary: '#8b5cf6',
     glow: '#a78bfa',
     border: '#7c3aed',
     text: '#c4b5fd',
   },
 
-  // NETWORK: Projects - S1s with members (indigo)
-  networkProject: {
+  // NETWORK: Hubs - Operations with members (indigo)
+  networkHub: {
     primary: '#6366f1',
     glow: '#818cf8',
     border: '#4f46e5',
     text: '#a5b4fc',
   },
 
-  // NETWORK: S1s without members (cyan)
-  networkS1: {
+  // NETWORK: Operations without members (cyan)
+  networkOperations: {
     primary: '#06b6d4',
     glow: '#22d3ee',
     border: '#0891b2',
@@ -102,8 +113,8 @@ export const COLORS = {
     text: '#fca5a5',
   },
 
-  // Legacy aliases for backward compatibility
-  s5: {
+  // Identity color (alias for localRoot for general use)
+  identity: {
     primary: '#10b981',
     glow: '#34d399',
     border: '#059669',
@@ -184,7 +195,7 @@ export const NODE_BOX = {
 export const LAYOUT = {
   // Topology
   centerOffset: { x: 0, y: 0 },
-  s1Radius: 200, // Distance of S1 nodes from center
+  operationsRadius: 200, // Distance of Operations nodes from center
   nodeGap: 20,
 
   // Zoom
@@ -194,6 +205,13 @@ export const LAYOUT = {
 
   // FocusPanel
   panelHeight: '85%',
+
+  // Black Box Cube
+  cube: {
+    base: 600,        // Base cube face size
+    expanded: 800,    // Expanded face size
+    perspective: 1500, // 3D perspective
+  },
 
   // Animation
   transitionDuration: '0.4s',
@@ -224,20 +242,20 @@ export function getNodeColors(role: NodeRole) {
   switch (role) {
     case 'local-root':
       return COLORS.localRoot;
-    case 'local-project':
-      return COLORS.localProject;
-    case 'local-s1':
-      return COLORS.localS1;
-    case 'network-s5':
-      return COLORS.networkS5;
-    case 'network-project':
-      return COLORS.networkProject;
-    case 'network-s1':
-      return COLORS.networkS1;
+    case 'local-hub':
+      return COLORS.localHub;
+    case 'local-operations':
+      return COLORS.localOperations;
+    case 'network-identity':
+      return COLORS.networkIdentity;
+    case 'network-hub':
+      return COLORS.networkHub;
+    case 'network-operations':
+      return COLORS.networkOperations;
     case 'algedonic':
       return COLORS.algedonic;
     default:
-      return COLORS.localS1;
+      return COLORS.localOperations;
   }
 }
 
@@ -254,12 +272,12 @@ export function determineNodeRole(
 
   if (level === 'local') {
     if (isRoot) return 'local-root';
-    if (hasMembers) return 'local-project';
-    return 'local-s1';
+    if (hasMembers) return 'local-hub';
+    return 'local-operations';
   } else {
-    if (isRoot) return 'network-s5';
-    if (hasMembers) return 'network-project';
-    return 'network-s1';
+    if (isRoot) return 'network-identity';
+    if (hasMembers) return 'network-hub';
+    return 'network-operations';
   }
 }
 
@@ -274,10 +292,10 @@ export function getNodeBorder(role: NodeRole, selected: boolean = false): string
 }
 
 // Legacy helper for backward compatibility
-export function getLegacyNodeColors(role: 's5' | 'member' | 'dao') {
+export function getLegacyNodeColors(role: 'identity' | 'member' | 'dao') {
   switch (role) {
-    case 's5':
-      return COLORS.s5;
+    case 'identity':
+      return COLORS.identity;
     case 'member':
       return COLORS.member;
     case 'dao':

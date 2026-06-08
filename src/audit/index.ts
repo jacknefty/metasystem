@@ -1,7 +1,8 @@
 /**
- * Audit Module (S3*)
+ * Audit Module (sporadic)
  *
  * Sporadic re-verification at each recursion level.
+ * Pluggable probe framework for different verification types.
  */
 
 export type {
@@ -17,3 +18,20 @@ export { auditNodeVerification } from './context/audit.js';
 export { auditContextAudit } from './dao/audit.js';
 
 export { selfAssess } from './assess.js';
+
+// Probe Framework
+export {
+  getProbe,
+  runProbe,
+  runAllProbes,
+  runRandomProbe,
+  probeSpine,
+  probeCirculatory,
+  probeInformational,
+  probeRecursion,
+  probeClosure,
+  type ProbeType,
+  type ProbeResult,
+  type ProbeFinding,
+  type ProbeFunction,
+} from './probes/index.js';

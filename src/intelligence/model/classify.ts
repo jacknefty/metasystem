@@ -1,5 +1,5 @@
 /**
- * S4 Classification — Project archetype detection
+ * Intelligence Classification — Project archetype detection
  *
  * Classifies software components by their VSM role, helping the system
  * understand the cybernetic purpose of each piece.

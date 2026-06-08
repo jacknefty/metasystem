@@ -56,7 +56,7 @@ export async function generateWorkGraphWithAudit(
   if (context.contextDir) {
     classification = await classifyContext(context.contextDir);
     if (classification) {
-      console.log(`[S4] Classified as: ${classification.archetype.name} (${(classification.confidence * 100).toFixed(0)}%)`);
+      console.log(`[Intelligence] Classified as: ${classification.archetype.name} (${(classification.confidence * 100).toFixed(0)}%)`);
 
       const critical = classification.suggestedVerifiers.filter(v => v.category === 'critical');
       archetypeSection = `
@@ -198,7 +198,7 @@ function buildDecompositionPrompt(
   context: HubContext,
   archetypeSection: string
 ): string {
-  return `You are S4 (Intelligence) in a Viable System Model. Decompose this work into vertical slices.
+  return `You are Intelligence in a Viable System Model. Decompose this work into vertical slices.
 
 CONTRACT:
 - Problem: ${contract.problem}
@@ -218,12 +218,12 @@ ${archetypeSection}
 ${buildVSMRolesPrompt()}
 
 FOLDER STRUCTURE — Place components by their VSM role:
-- S1:operations → operations/
-- S2:coordination → coordination/
-- S3:control → control/
-- S3*:audit → audit/
-- S4:intelligence → intelligence/
-- S5:identity → identity/
+- operations → operations/
+- coordination → coordination/
+- control → control/
+- audit → audit/
+- intelligence → intelligence/
+- identity → identity/
 - transducer:inward, transducer:outward → bridge/
 - channel:algedonic → bridge/
 - channel:data → coordination/channels/
@@ -259,7 +259,7 @@ RESPOND WITH JSON ONLY:
           "id": "w-story-id",
           "name": "Story Name",
           "outcome": "What this story delivers",
-          "vsmRole": "S1:operations | S2:coordination | S3:control | S3*:audit | S4:intelligence | S5:identity | transducer:inward | transducer:outward | channel:algedonic | channel:data | substrate",
+          "vsmRole": "operations | coordination | control | audit | intelligence | identity | transducer:inward | transducer:outward | channel:algedonic | channel:data | substrate",
           "conditions": [
             { "description": "Module exists", "verifier": "exists:path/to/file" },
             { "description": "Function defined", "verifier": "contains:path/to/file:functionName" },

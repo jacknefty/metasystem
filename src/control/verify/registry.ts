@@ -4,7 +4,7 @@
  * Single source of truth for all verifier metadata:
  * - Categories and weights (variety bits)
  * - Autonomy flags and confidence caps
- * - 2-bit capability encoding (S1 existence / S3 correctness)
+ * - 2-bit capability encoding (existence / correctness)
  * - Prompt generation for LLM decomposition
  */
 
@@ -237,10 +237,10 @@ export function getMaxConfidence(verifier: string): number {
 /**
  * 2-bit capability encoding for token minting
  *
- * bit 0: checksExistence (S1 - flow verified)
+ * bit 0: checksExistence (Operations - flow verified)
  *        "Does the thing exist / flow through?"
  *
- * bit 1: checksCorrectness (S3 - state verified)
+ * bit 1: checksCorrectness (Control - state verified)
  *        "Is the state correct / behavior right?"
  *
  * 00 = nothing verified (shouldn't happen)

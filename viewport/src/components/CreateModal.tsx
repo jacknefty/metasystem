@@ -108,7 +108,7 @@ export function CreateModal({ hubId, onClose, onCreated }: CreateModalProps) {
         return;
       }
 
-      // Join the hub (makes hubId the S5 for this node)
+      // Join the hub (makes hubId the Identity for this node)
       await joinNode(node.id, hubId);
 
       onCreated();

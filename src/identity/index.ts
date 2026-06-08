@@ -58,6 +58,48 @@ export {
   type ScaffoldOptions,
 } from './scaffold.js';
 
+// Spine (VSM port structure)
+export {
+  createSpine,
+  loadSpine,
+  saveSpine,
+  ensureSpine,
+  bind,
+  unbind,
+  receive,
+  send,
+  resetCycle,
+  measureVariety,
+  sumOverflow,
+  sumCapacity,
+  sumLoad,
+  getAllPorts,
+  sumLoadByDirection,
+  checkEssentialVariables,
+  checkTimeInvariants,
+  detectPortAnomalies,
+  shouldTriggerAudit,
+  markAuditTriggered,
+  evaluateEssentialVariable,
+  TIME_SCALES,
+  DEFAULT_ESSENTIAL_VARIABLES,
+  DEFAULT_STEP_PARAMETERS,
+  type Spine,
+  type Port,
+  type Transducer,
+  type PortDirection,
+  type PortTrigger,
+  type EssentialVariable,
+  type StepParameter,
+  type EscalationLevel,
+  type TimeInvariants,
+  type PortAnomaly,
+  type PainSignal,
+  type ControlIntelligenceTension,
+  type ResourceNegotiation,
+  type AccountabilityReport,
+} from './spine.js';
+
 // Settings
 export {
   resolveSettings,
@@ -88,10 +130,35 @@ export {
   canClose,
   updateClosureCondition,
   updateScopeProgress,
+  loadIdentityAtScope,
+  saveIdentityAtScope,
   type IdentityContract,
   type IdentityFrontmatter,
   type Membership,
 } from './contract.js';
+
+// Policy (Identity updates)
+export {
+  emitPolicy,
+  proposePolicyChange,
+  receivePolicyFromParent,
+  type PolicyChangeType,
+  type PolicyChange,
+} from './policy.js';
+
+// Drift (identity deviation detection)
+export {
+  evaluateIdentityDrift,
+  checkAndHandleDrift,
+  probeIdentityDrift,
+  type DriftAnalysis,
+} from './drift.js';
+
+// Scoped paths (listChildren, getParentPath)
+export {
+  listChildren,
+  getParentPath,
+} from './scoped-paths.js';
 
 // Merkle (identity attestation)
 export {

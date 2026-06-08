@@ -193,13 +193,13 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
               background: isDAO
                 ? `${COLORS.dao.primary}20`
                 : isRoot
-                ? `${COLORS.s5.primary}20`
+                ? `${COLORS.identity.primary}20`
                 : `${COLORS.member.primary}20`,
               border: `1px solid ${
                 isDAO
                   ? COLORS.dao.border
                   : isRoot
-                  ? COLORS.s5.border
+                  ? COLORS.identity.border
                   : COLORS.member.border
               }`,
             }}
@@ -209,7 +209,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                 color: isDAO
                   ? COLORS.dao.text
                   : isRoot
-                  ? COLORS.s5.text
+                  ? COLORS.identity.text
                   : COLORS.member.text,
               }}
             >
@@ -222,7 +222,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
               {isDAO ? (daoDetail?.name || `${nodeId.slice(0, 6)}...${nodeId.slice(-4)}`) : (identity?.name || nodeId)}
             </div>
             <div className="text-xs" style={{ color: COLORS.text.muted }}>
-              {isDAO ? 'DAO' : isRoot ? 'Root (S5)' : 'Node'}
+              {isDAO ? 'DAO' : isRoot ? 'Root (Identity)' : 'Node'}
             </div>
           </div>
         </div>
@@ -284,13 +284,13 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
 
         {activeTab === 'wave' && !isDAO && (
           <div className="h-full -mx-5 -mb-5">
-            <WaveGraph projectId={nodeId} compact />
+            <WaveGraph hubId={nodeId} compact />
           </div>
         )}
 
         {activeTab === 'particle' && (
           <div className="h-full -mx-5 -mb-5" style={{ minHeight: 400 }}>
-            <WaveGraph projectId={nodeId} />
+            <WaveGraph hubId={nodeId} />
           </div>
         )}
 
@@ -372,7 +372,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
               </div>
             </div>
 
-            {/* Members (S1s that joined this node) */}
+            {/* Members (Operations that joined this node) */}
             <div>
               <div
                 className="text-xs uppercase tracking-wide mb-2"
@@ -410,7 +410,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
               )}
             </div>
 
-            {/* Member Of (S5s this node joined) */}
+            {/* Member Of (Identities this node joined) */}
             {identity.memberships && identity.memberships.length > 0 && (
               <div>
                 <div
@@ -834,7 +834,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                         style={{ background: COLORS.bg.elevated }}
                       >
                         <div className="text-xs" style={{ color: COLORS.text.muted }}>
-                          Perceived (S4)
+                          Perceived (Intelligence)
                         </div>
                         <div className="text-xl font-mono" style={{ color: COLORS.text.primary }}>
                           {variety.perceived}
@@ -845,7 +845,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                         style={{ background: COLORS.bg.elevated }}
                       >
                         <div className="text-xs" style={{ color: COLORS.text.muted }}>
-                          Resolved (S3)
+                          Resolved (Control)
                         </div>
                         <div className="text-xl font-mono" style={{ color: COLORS.text.primary }}>
                           {variety.resolved}
@@ -1102,11 +1102,11 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                 <div
                   className="p-4 rounded-lg"
                   style={{
-                    background: `${COLORS.s5.primary}08`,
-                    border: `1px solid ${COLORS.s5.border}`,
+                    background: `${COLORS.identity.primary}08`,
+                    border: `1px solid ${COLORS.identity.border}`,
                   }}
                 >
-                  <div className="text-sm font-medium mb-2" style={{ color: COLORS.s5.text }}>
+                  <div className="text-sm font-medium mb-2" style={{ color: COLORS.identity.text }}>
                     Variety Engineering Controls
                   </div>
                   <div className="text-xs" style={{ color: COLORS.text.muted }}>
@@ -1192,7 +1192,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                           className="text-xs mt-1"
                           style={{ color: COLORS.text.muted }}
                         >
-                          Allow S3 to auto-assign bounties to this node
+                          Allow Control to auto-assign bounties to this node
                         </div>
                       </div>
                       <button
@@ -1582,7 +1582,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                   </div>
                 )}
 
-                {/* S5 Admin */}
+                {/* Identity Admin */}
                 {isRoot && (
                   <div
                     className="pt-4 mt-4"
@@ -1592,7 +1592,7 @@ export function FocusPanel({ nodeId, onClose }: FocusPanelProps) {
                       className="text-xs uppercase tracking-wide mb-3"
                       style={{ color: COLORS.status.warning }}
                     >
-                      S5 Admin
+                      Identity Admin
                     </div>
                     <button
                       onClick={async () => {

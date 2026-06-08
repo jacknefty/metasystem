@@ -23,6 +23,18 @@ import { runToolAuditPass } from './operations/tools/audit.js';
 import { finalizeProposal } from './coordination/governance/index.js';
 import { maybeCommitMerkleRoot } from './coordination/bridge/auto-commit.js';
 import { checkIdentityRoot } from './identity/sync.js';
+import { checkAndEscalate } from './control/escalation.js';
+import { at, dao } from './identity/scoped-paths.js';
+import { paths } from './identity/paths.js';
+import { startCapacityPerception } from './intelligence/perceive/capacity.js';
+import {
+  loadSpine,
+  saveSpine,
+  checkTimeInvariants,
+  shouldTriggerAudit,
+  markAuditTriggered,
+  detectPortAnomalies,
+} from './identity/spine.js';
 import type { ChainEvent } from './coordination/channels/events.js';
 
 let running = false;
@@ -70,6 +82,9 @@ export function startRuntime(): () => void {
             console.error('[Runtime] Tool audit failed:', err);
           });
         }
+
+        // Check time invariants and port anomalies
+        await checkSpineHealth();
       } catch (err) {
         await emitPain('dynamics', event.subject, err);
       }
@@ -226,7 +241,7 @@ export function startRuntime(): () => void {
     }
   });
 
-  // P0 Fix: algedonic:pain → take action based on severity
+  // P0 Fix: algedonic:pain → take action based on severity + escalation
   chain.on('event', async (event: ChainEvent) => {
     if (!running) return;
     if (event.type === 'algedonic:pain') {
@@ -235,6 +250,8 @@ export function startRuntime(): () => void {
         source: string;
         message: string;
         hubId?: string;
+        escalationLevel?: number;
+        requiresAttestation?: boolean;
       };
 
       console.log(`[Algedonic] Pain signal: severity=${payload.severity} source=${payload.source} message=${payload.message}`);
@@ -246,12 +263,22 @@ export function startRuntime(): () => void {
             source: payload.source,
             severity: payload.severity,
           });
+
+          // Check essential variables and escalate if needed
+          const hubScope = at(paths.hub(payload.hubId));
+          const escalation = await checkAndEscalate(hubScope);
+          if (escalation.escalated) {
+            console.log(`[Escalation] Escalated to ${escalation.level}: ${escalation.breaches.map(b => b.variable.name).join(', ')}`);
+          }
         }
         await maybeRunHousekeeping();
       }
 
       if (payload.severity >= 3) {
         console.warn(`[Algedonic] CRITICAL: ${payload.message}`);
+        if (payload.requiresAttestation) {
+          console.warn(`[Algedonic] Requires attestation before proceeding`);
+        }
       }
     }
   });
@@ -261,6 +288,27 @@ export function startRuntime(): () => void {
     if (!running) return;
     if (event.type === 'algedonic:acknowledged') {
       console.log(`[Algedonic] Signal acknowledged: ${event.subject}`);
+    }
+  });
+
+  // Accountability: emit reports on significant events
+  chain.on('event', async (event: ChainEvent) => {
+    if (!running) return;
+
+    if (event.type === 'work:completed') {
+      const payload = event.payload as { hubId?: string };
+      if (payload.hubId) {
+        const { emitReportOnEvent } = await import('./coordination/channels/accountability.js');
+        await emitReportOnEvent(paths.hub(payload.hubId), 'work_completed');
+      }
+    }
+
+    if (event.type === 'algedonic:pain') {
+      const payload = event.payload as { hubId?: string; severity: number };
+      if (payload.hubId && payload.severity >= 2) {
+        const { emitReportOnEvent } = await import('./coordination/channels/accountability.js');
+        await emitReportOnEvent(paths.hub(payload.hubId), 'alarm');
+      }
     }
   });
 
@@ -331,6 +379,9 @@ export function startRuntime(): () => void {
     console.error('[Identity] Initial root check failed:', err);
   });
 
+  // Start Intelligence capacity perception (learns from escalation events)
+  startCapacityPerception();
+
   console.log('[Runtime] Started (event-driven)');
   console.log('  - variety:env:in → dynamics check + sporadic tool audit');
   console.log('  - work:claimed → execute work');
@@ -346,6 +397,7 @@ export function startRuntime(): () => void {
   console.log('  - work:created → auto-post bounty');
   console.log('  - merkle:committed → periodic (30s)');
   console.log('  - identity:root:changed → periodic (60s)');
+  console.log('  - Intelligence capacity perception → learns from escalations');
   console.log('  - tools registered: builtin + MCP');
 
   return () => stopRuntime();
@@ -442,5 +494,73 @@ async function emitPain(source: string, subject: string, err: unknown): Promise<
     });
   } catch {
     // Ignore errors emitting pain
+  }
+}
+
+/**
+ * Check spine health: time invariants and port anomalies.
+ * Fires pain signals for Fourth Principle violations.
+ */
+async function checkSpineHealth(): Promise<void> {
+  const spine = loadSpine(dao);
+  if (!spine) return;
+
+  // Check time invariants (Fourth Principle)
+  const timeCheck = checkTimeInvariants(spine);
+  if (!timeCheck.valid) {
+    for (const violation of timeCheck.violations) {
+      await getChain().append('algedonic:pain', 'time_invariant', spine.scopeId, {
+        severity: 1,
+        source: 'spine',
+        message: `Fourth Principle violation: ${violation}`,
+      });
+    }
+  }
+
+  // Check port anomalies (flooding/lagging)
+  const anomalies = detectPortAnomalies(spine);
+  for (const anomaly of anomalies) {
+    const severity = anomaly.type === 'flooding' ? 2 : 1;
+    await getChain().append('algedonic:pain', 'port_anomaly', anomaly.portId, {
+      severity,
+      source: 'spine',
+      message: `Port ${anomaly.portId} ${anomaly.type}: ${anomaly.timeSinceLast}ms since last (expected ${anomaly.expectedCycle}ms)`,
+    });
+  }
+
+  // Audit (sporadic) trigger - 10% random when eligible
+  if (shouldTriggerAudit(spine)) {
+    console.log(`[Runtime] Sporadic audit triggered`);
+    markAuditTriggered(spine);
+    saveSpine(dao, spine);
+
+    // Run random probe from the framework
+    const { runRandomProbe } = await import('./audit/probes/index.js');
+    const probeResult = await runRandomProbe(dao.root());
+
+    // Fire audit event with probe results
+    await getChain().append('audit:triggered', 'runtime', spine.scopeId, {
+      probeType: probeResult.probeType,
+      triggeredAt: Date.now(),
+      healthy: probeResult.healthy,
+      findingCount: probeResult.findings.length,
+      scopeId: probeResult.scopeId,
+    });
+
+    // Fire pain signals for unhealthy probes
+    if (!probeResult.healthy) {
+      for (const finding of probeResult.findings.filter(f => f.severity >= 2)) {
+        await getChain().append('algedonic:pain', `probe:${probeResult.probeType}`, spine.scopeId, {
+          severity: finding.severity as 1 | 2 | 3,
+          source: `probe:${probeResult.probeType}`,
+          message: finding.message,
+        });
+      }
+    }
+
+    // Also run behavioral self-assessment
+    selfAssess('sporadic').catch(err => {
+      console.error('[Runtime] Sporadic audit failed:', err);
+    });
   }
 }

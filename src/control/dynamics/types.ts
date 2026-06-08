@@ -201,7 +201,7 @@ export interface ActionEvaluation {
 }
 
 // =============================================================================
-// S4 Field — Derived from F
+// Intelligence Field — Derived from F
 // =============================================================================
 
 export interface CapabilityGap {
@@ -229,7 +229,7 @@ export interface Threat {
   source: string;
 }
 
-export interface S4Field {
+export interface IntelligenceField {
   scope: Scope;
   F: number;              // aggregate free energy
   gaps: CapabilityGap[];

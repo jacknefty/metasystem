@@ -1,5 +1,5 @@
 /**
- * Closure Progress Check (S3)
+ * Closure Progress Check (Control)
  *
  * Are closure conditions actually progressing, or stalled?
  */

@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { COLORS } from '../design-system';
 import {
   api,
-  fetchProjectAlgedonics,
+  fetchHubAlgedonics,
   fetchIdentity,
   fetchPendingNeeds,
   approveNeed,
@@ -42,7 +42,7 @@ interface ChatMessage {
   remedyLabel?: string;
   remedyHint?: string;
   workId?: string;
-  projectId?: string;
+  hubId?: string;
 }
 
 interface ChatPanelProps {
@@ -55,7 +55,7 @@ interface CustomModeFromAPI {
   name: string;
   icon?: string;
   context: string;
-  appliesTo?: ('project' | 'member' | 's5')[];
+  appliesTo?: ('project' | 'member' | 'identity')[];
   color?: string;
 }
 
@@ -161,12 +161,12 @@ function RemedyButton({ msg, nodeId, onAction }: RemedyButtonProps) {
           break;
 
         case 'autonomousMode':
-          success = await updateIdentitySetting(msg.projectId || nodeId, 'autonomousMode', true);
+          success = await updateIdentitySetting(msg.hubId || nodeId, 'autonomousMode', true);
           resultMsg = success ? 'Autonomous mode enabled' : 'Failed to update setting';
           break;
 
         case 'increaseAttempts':
-          success = await updateIdentitySetting(msg.projectId || nodeId, 'maxAttempts', 10);
+          success = await updateIdentitySetting(msg.hubId || nodeId, 'maxAttempts', 10);
           resultMsg = success ? 'Max attempts increased to 10' : 'Failed to update setting';
           break;
 
@@ -427,7 +427,7 @@ export function ChatPanel({ nodeId, executor }: ChatPanelProps) {
     const loadAlgedonics = async () => {
       try {
         const [signals, needs] = await Promise.all([
-          fetchProjectAlgedonics(nodeId),
+          fetchHubAlgedonics(nodeId),
           fetchPendingNeeds(),
         ]);
         setPendingNeeds(needs);
@@ -458,7 +458,7 @@ export function ChatPanel({ nodeId, executor }: ChatPanelProps) {
               remedyLabel: signal.remedyLabel,
               remedyHint: signal.remedyHint,
               workId: signal.workId,
-              projectId: signal.projectId,
+              hubId: signal.hubId,
             });
           }
         });
@@ -473,7 +473,7 @@ export function ChatPanel({ nodeId, executor }: ChatPanelProps) {
         const payload = event.payload as {
           severity: 1 | 2 | 3;
           signal: string;
-          projectId?: string;
+          hubId?: string;
           workId?: string;
           agentId?: string;
           failureCode?: string;
@@ -483,8 +483,8 @@ export function ChatPanel({ nodeId, executor }: ChatPanelProps) {
           remedyLabel?: string;
           remedyHint?: string;
         };
-        // Only show if this signal is for our project
-        if (payload.projectId === nodeId || event.subject === nodeId) {
+        // Only show if this signal is for our hub
+        if (payload.hubId === nodeId || event.subject === nodeId) {
           // Check if there's a pending need for this work
           const matchingNeed = pendingNeeds.find(n => n.contractId === payload.workId);
           addMessage({
@@ -500,7 +500,7 @@ export function ChatPanel({ nodeId, executor }: ChatPanelProps) {
             remedyLabel: payload.remedyLabel,
             remedyHint: payload.remedyHint,
             workId: payload.workId,
-            projectId: payload.projectId,
+            hubId: payload.hubId,
           });
         }
       }
@@ -624,7 +624,7 @@ export function ChatPanel({ nodeId, executor }: ChatPanelProps) {
           response: string;
           workContractsCreated?: string[];
         }>(activeEndpoint, {
-          projectId: nodeId,
+          hubId: nodeId,
           message: messageText,
           sessionId: pmSession,
           context: currentContext,

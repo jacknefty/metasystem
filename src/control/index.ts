@@ -1,10 +1,10 @@
 /**
- * Control — Public API (S3)
+ * Control — Public API
  *
- * Verification, balance/homeostat, dynamics.
+ * Verification, balance/homeostat, dynamics, escalation.
  */
 
-// Balance (S3/S4 homeostat)
+// Balance (Control/Intelligence homeostat)
 export {
   invokeAvailableNodes,
   invokePerception,
@@ -23,6 +23,17 @@ export {
   runChecks,
   type VerifierResult,
 } from './verify/index.js';
+
+// Escalation (ultrastability ladder)
+export {
+  checkAndEscalate,
+  fireAlarm,
+  acknowledgeAlarm,
+  canActivateCommand,
+  getEscalationState,
+  clearEscalationState,
+  type EscalationState,
+} from './escalation.js';
 
 // Dynamics (re-export key items from dynamics/index.ts)
 export {
@@ -47,8 +58,8 @@ export {
   // Action
   selectAction,
   getCandidateActions,
-  // S4 Field
-  buildS4Field,
+  // Intelligence Field
+  buildIntelligenceField,
   // Mint
   mintOnCompletion,
   getNetworkState,

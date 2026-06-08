@@ -8,7 +8,7 @@ export interface Mode {
   icon?: string;
   context: string;
   endpoint?: string;  // if set, this is an endpoint mode (exclusive)
-  appliesTo?: ('project' | 'member' | 's5')[];
+  appliesTo?: ('project' | 'member' | 'identity')[];
   color?: string;
   isCustom?: boolean;
 }

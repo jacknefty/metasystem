@@ -1,77 +1,43 @@
 /**
- * Free Energy Computation — Recursive Path-Based
+ * Free Energy Computation — Spine-Based with Recursive Aggregation
  *
- * F(S) = Σ variety:in(S) - Σ variety:out(S)
+ * Local F = sumOverflow(spine) — variety that couldn't be absorbed
+ * Aggregate F = local F + Σ children's aggregate F
+ *
  * H(S) = Σ (1 - confidence(τ)) × weight   (epistemic uncertainty)
  * G(S) = F(S) + γ × H(S)                  (expected free energy)
  *
  * Scale-free: single recursive function works at any depth.
- * Aggregates upward through scope hierarchy via chain queries.
+ * Spine is source of truth for local variety; aggregates upward.
  */
 
 import { getChain } from '../../coordination/channels/chain.js';
-import { at, depth as scopeDepth } from '../../identity/scoped-paths.js';
+import { at, depth as scopeDepth, listChildren } from '../../identity/scoped-paths.js';
+import { loadSpine, sumOverflow } from '../../identity/spine.js';
 import type { Scope, FreeEnergyState, Configuration, Vector, DynamicsParameters } from './types.js';
 import { scopeKey, getParentScope, DEFAULT_PARAMETERS } from './types.js';
 
-/**
- * Query child scopes from chain events.
- * Children are hubs, epics, stories, tasks, or nodes created under this scope.
- */
-export async function listChildScopes(scope: Scope): Promise<Scope[]> {
-  const scopePath = scope.root();
-
-  const events = await getChain().recall({
-    type: [
-      'hub:created',
-      'epic:created',
-      'story:created',
-      'task:created',
-      'identity:created',
-      'work:created',
-    ],
-  });
-
-  const children: Scope[] = [];
-
-  for (const event of events) {
-    const payload = event.payload as {
-      scopePath?: string;
-      parentPath?: string;
-      contextPath?: string;
-      hubId?: string;
-    };
-
-    const eventPath = payload.scopePath || payload.contextPath;
-    const parentPath = payload.parentPath;
-
-    if (parentPath === scopePath) {
-      if (eventPath) {
-        children.push(at(eventPath));
-      }
-    } else if (eventPath && isDirectChild(scopePath, eventPath)) {
-      children.push(at(eventPath));
-    }
-  }
-
-  return children;
-}
-
-/**
- * Check if childPath is a direct child of parentPath (one level down)
- */
-function isDirectChild(parentPath: string, childPath: string): boolean {
-  if (!childPath.startsWith(parentPath)) return false;
-  const remainder = childPath.slice(parentPath.length).replace(/^\//, '');
-  // Direct child has exactly 2 segments: type/id (e.g., "contexts/auth")
-  const segments = remainder.split('/').filter(Boolean);
-  return segments.length === 2;
-}
+// Re-export listChildren for backward compatibility
+export { listChildren as listChildScopes } from '../../identity/scoped-paths.js';
 
 // Cache for computed F values (short TTL)
 const fCache = new Map<string, { F: number; computedAt: number }>();
 const CACHE_TTL = 5000; // 5 seconds
 
+/**
+ * Get local free energy at a scope (no children).
+ * Local F = sumOverflow(spine) — variety that couldn't be absorbed.
+ */
+export function getLocalFreeEnergy(scope: Scope): number {
+  const spine = loadSpine(scope);
+  if (!spine) return 0;
+  return sumOverflow(spine);
+}
+
+/**
+ * Get aggregate free energy (local + children).
+ * This is the primary F metric for homeostat decisions.
+ */
 export async function getFreeEnergy(scope: Scope): Promise<number> {
   const key = scopeKey(scope);
   const cached = fCache.get(key);
@@ -141,7 +107,7 @@ async function computeEpistemicValue(
   const localH = await computeLocalH(scope, params);
 
   // Children's H
-  const children = await listChildScopes(scope);
+  const children = await listChildren(scope);
   let childrenH = 0;
   for (const child of children) {
     childrenH += await computeEpistemicValue(child, params);
@@ -185,12 +151,13 @@ async function isVarietyResolved(subject: string, scopePath: string): Promise<bo
 
 /**
  * Recursive free energy computation.
- * F = local F + sum of children's F
+ * F = local F (from spine overflow) + sum of children's F
  */
 async function computeFreeEnergy(scope: Scope): Promise<number> {
-  const localF = await computeLocalF(scope);
+  // Primary source: spine overflow
+  const localF = getLocalFreeEnergy(scope);
 
-  const children = await listChildScopes(scope);
+  const children = await listChildren(scope);
   let childrenF = 0;
   for (const child of children) {
     childrenF += await computeFreeEnergy(child);
@@ -200,10 +167,11 @@ async function computeFreeEnergy(scope: Scope): Promise<number> {
 }
 
 /**
- * Local free energy at a single scope (no children).
- * F_local = perceived - resolved from variety events at this path.
+ * Legacy local F computation from chain events.
+ * Kept for backward compatibility during transition.
+ * @deprecated Use getLocalFreeEnergy() which reads from spine
  */
-async function computeLocalF(scope: Scope): Promise<number> {
+async function computeLocalFFromChain(scope: Scope): Promise<number> {
   const { perceived, resolved } = await getLocalVarietyBalance(scope);
   return perceived - resolved;
 }
@@ -215,7 +183,7 @@ async function computeLocalF(scope: Scope): Promise<number> {
 async function getVarietyBalance(scope: Scope): Promise<{ perceived: number; resolved: number }> {
   const local = await getLocalVarietyBalance(scope);
 
-  const children = await listChildScopes(scope);
+  const children = await listChildren(scope);
   let childPerceived = 0;
   let childResolved = 0;
 
@@ -394,8 +362,8 @@ export async function getFreeEnergyAggregate(scope: Scope): Promise<FreeEnergyAg
 }
 
 async function computeAggregateState(scope: Scope): Promise<FreeEnergyAggregateState> {
-  const F_local = await computeLocalF(scope);
-  const children = await listChildScopes(scope);
+  const F_local = getLocalFreeEnergy(scope);
+  const children = await listChildren(scope);
 
   let F_children = 0;
   for (const child of children) {

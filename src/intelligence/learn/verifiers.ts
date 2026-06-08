@@ -82,7 +82,7 @@ export async function recordPainSignal(
   failureDescription: string,
   suggestedVerifier: string
 ): Promise<void> {
-  await getChain().append('learning:verifier:recorded', 's4', workId, {
+  await getChain().append('learning:verifier:recorded', 'intelligence', workId, {
     hubId,
     pattern: suggestedVerifier,
     failureDescription,
@@ -97,7 +97,7 @@ export async function recordPainSignal(
     await proposeToGlobalRegistry(hubId, verifier);
   }
 
-  console.log(`[S4/Learn] Recorded pain signal: ${suggestedVerifier} (catches: ${verifier?.catchCount || 1})`);
+  console.log(`[Intelligence/Learn] Recorded pain signal: ${suggestedVerifier} (catches: ${verifier?.catchCount || 1})`);
 }
 
 export async function recordFalsePositive(
@@ -106,7 +106,7 @@ export async function recordFalsePositive(
   pattern: string,
   reason: string
 ): Promise<void> {
-  await getChain().append('learning:verifier:false-positive', 's4', workId, {
+  await getChain().append('learning:verifier:false-positive', 'intelligence', workId, {
     hubId,
     pattern,
     reason,
@@ -114,14 +114,14 @@ export async function recordFalsePositive(
 
   stores.delete(hubId);
 
-  console.log(`[S4/Learn] False positive recorded: ${pattern}`);
+  console.log(`[Intelligence/Learn] False positive recorded: ${pattern}`);
 }
 
 async function proposeToGlobalRegistry(
   hubId: string,
   verifier: LearnedVerifier
 ): Promise<void> {
-  await getChain().append('learning:verifier:proposed', 's4', hubId, {
+  await getChain().append('learning:verifier:proposed', 'intelligence', hubId, {
     hubId,
     pattern: verifier.pattern,
     catchCount: verifier.catchCount,
@@ -129,7 +129,7 @@ async function proposeToGlobalRegistry(
 
   stores.delete(hubId);
 
-  console.log(`[S4/Learn] Proposed to global registry: ${verifier.pattern}`);
+  console.log(`[Intelligence/Learn] Proposed to global registry: ${verifier.pattern}`);
 }
 
 export async function getGlobalVerifiers(): Promise<LearnedVerifier[]> {

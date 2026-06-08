@@ -1,5 +1,5 @@
 /**
- * Tool Policy Check (S3)
+ * Tool Policy Check (Control)
  *
  * Did the node use only allowed tools?
  * Uses allowedTools/deniedTools from NodeSettings.

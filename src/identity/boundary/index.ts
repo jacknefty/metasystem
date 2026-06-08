@@ -1,7 +1,7 @@
 /**
  * Identity Boundary — Runtime enforcement of identity scope
  *
- * S5 sets policy (settings.ts), boundary enforces it at runtime.
+ * Identity sets policy (settings.ts), boundary enforces it at runtime.
  */
 
 import type { SecurityProvider, SecurityContext, CreateContextParams } from './types.js';

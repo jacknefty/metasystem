@@ -1,5 +1,5 @@
 /**
- * Node Settings — S5 Policy Parameters
+ * Node Settings — Identity Policy Parameters
  *
  * Locally, node owners set them via updateSettings().
  * At network level, changes require governance votes.

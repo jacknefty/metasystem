@@ -7,7 +7,7 @@
 
 import type { Scope } from '../../control/dynamics/types.js';
 
-export type ProposalType = 'hub' | 'work' | 'claim' | 'amendment';
+export type ProposalType = 'hub' | 'work' | 'claim' | 'amendment' | 'policy_change' | 'custom';
 export type ProposalStatus = 'open' | 'passed' | 'rejected' | 'expired';
 
 export interface Proposal {

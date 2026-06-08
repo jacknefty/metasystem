@@ -1,15 +1,15 @@
 /**
- * S4 Field — Build field from chain events
+ * Intelligence Field — Build field from chain events
  *
  * Gaps, opportunities, threats derived from events.
  */
 
 import { getChain } from '../../../coordination/channels/chain.js';
 import { listWork, listAvailableWork } from '../../../coordination/resources/work.js';
-import type { S4Field, CapabilityGap, Opportunity, Threat, Configuration } from './types.js';
+import type { IntelligenceField, CapabilityGap, Opportunity, Threat, Configuration } from './types.js';
 import { analyzeEmptyBranches } from './learning.js';
 
-export async function getS4Field(): Promise<S4Field> {
+export async function getIntelligenceField(): Promise<IntelligenceField> {
   const [gaps, opportunities, threats] = await Promise.all([
     buildGaps(),
     buildOpportunities(),

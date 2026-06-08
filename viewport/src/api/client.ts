@@ -84,7 +84,7 @@ export interface Work {
   id: string;
   name: string;
   ownerId: string;
-  projectId: string;
+  hubId: string;
   scope: string[];
   status: string;
   dependsOn: string[];
@@ -118,7 +118,7 @@ export interface BountyWork {
   id: string;
   name: string;
   ownerId: string;
-  projectId: string;
+  hubId: string;
   scope: string[];
   status: string;
   bountyStatus?: 'posted' | 'claimed' | 'submitted' | 'verified' | 'completed' | 'expired' | 'failed';
@@ -222,8 +222,8 @@ export async function leaveNode(memberId: string, hubId: string, reason?: string
 // Bounty API Functions
 // =============================================================================
 
-export async function fetchBountyPool(projectId?: string): Promise<BountyWork[]> {
-  const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+export async function fetchBountyPool(hubId?: string): Promise<BountyWork[]> {
+  const query = hubId ? `?hubId=${encodeURIComponent(hubId)}` : '';
   const res = await api.get<BountyWork[]>(`/pool${query}`);
   return res.data || [];
 }
@@ -281,8 +281,8 @@ export async function submitBountyWork(workId: string, branch: string): Promise<
   return res.ok;
 }
 
-export async function fetchWork(projectId?: string): Promise<Work[]> {
-  const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+export async function fetchWork(hubId?: string): Promise<Work[]> {
+  const query = hubId ? `?hubId=${encodeURIComponent(hubId)}` : '';
   const res = await api.get<Work[]>(`/work${query}`);
   return res.data || [];
 }
@@ -327,8 +327,8 @@ export interface WorkGraph {
   };
 }
 
-export async function fetchWorkGraph(projectId: string): Promise<WorkGraph | null> {
-  const res = await api.get<WorkGraph>(`/work/graph/${projectId}`);
+export async function fetchWorkGraph(hubId: string): Promise<WorkGraph | null> {
+  const res = await api.get<WorkGraph>(`/work/graph/${hubId}`);
   return res.data || null;
 }
 
@@ -456,7 +456,7 @@ export async function updateIdentitySettings(
   return res.data || DEFAULT_SETTINGS;
 }
 
-// S5 Operations
+// Identity Operations
 export interface PurgeResult {
   ok: boolean;
   purged: string[];
@@ -515,9 +515,9 @@ export async function fetchResolution(contractId: string): Promise<Resolution | 
 
 export interface HomeostatResult {
   balance: VarietyBalance;
-  action: 'none' | 'boost_s4' | 'boost_s3';
+  action: 'none' | 'boost_intelligence' | 'boost_control';
   allowDispatch: boolean;
-  s4Multiplier: number;
+  intelligenceMultiplier: number;
   diagnosis: string;
 }
 
@@ -565,7 +565,7 @@ export interface AlgedonicSignal {
   type: 'pain' | 'pleasure';
   source: string;
   subject: string;
-  projectId?: string;
+  hubId?: string;
   workId?: string;
   agentId?: string;
   intensity: number;
@@ -591,8 +591,8 @@ export async function fetchAllAlgedonics(): Promise<AlgedonicSignal[]> {
   return res.data || [];
 }
 
-export async function fetchProjectAlgedonics(projectId: string): Promise<AlgedonicSignal[]> {
-  const res = await api.get<AlgedonicSignal[]>(`/algedonic/project/${projectId}`);
+export async function fetchHubAlgedonics(hubId: string): Promise<AlgedonicSignal[]> {
+  const res = await api.get<AlgedonicSignal[]>(`/algedonic/hub/${hubId}`);
   return res.data || [];
 }
 
@@ -924,4 +924,240 @@ export async function fetchFreeEnergyAggregate(
 
   const res = await api.get<FreeEnergyAggregateState>(`/dynamics/free-energy/aggregate?${params}`);
   return res.data || null;
+}
+
+// =============================================================================
+// Scope/Transducer API
+// =============================================================================
+
+export interface ScopeChildSummary {
+  id: string;
+  name: string;
+  type: string;
+  status: 'healthy' | 'stressed' | 'critical';
+  F: number;
+  progress: number;
+  pendingInterventions: string[];
+}
+
+export interface GovernanceView {
+  spine: unknown;
+  subsystems: Array<{
+    id: string;
+    name: string;
+    health: 'healthy' | 'stressed' | 'critical';
+    load: number;
+    capacity: number;
+  }>;
+  varietyFlow: {
+    totalIn: number;
+    totalOut: number;
+    throughput: number;
+    bottlenecks: string[];
+  };
+  F: number;
+  escalationLevel: number;
+  lastAudit: number | null;
+  balance: 'control_dominant' | 'intelligence_dominant' | 'balanced';
+  recentEvents: Array<{
+    id: string;
+    type: string;
+    timestamp: number;
+    subject: string;
+    payload?: Record<string, unknown>;
+  }>;
+}
+
+export interface OperationsView {
+  summary: {
+    status: 'healthy' | 'stressed' | 'critical';
+    statusEmoji: string;
+    oneLiner: string;
+  };
+  attention: Array<{
+    id: string;
+    type: 'alarm' | 'escalation' | 'request' | 'blocked';
+    summary: string;
+    actions: Array<{ id: string; label: string; type: string }>;
+  }>;
+  activity: Array<{
+    id: string;
+    type: string;
+    summary: string;
+    timestamp: number;
+    ago: string;
+  }>;
+  resources: {
+    activeWork: number;
+    pendingBounties: number;
+    availableCapacity: number;
+  };
+}
+
+export interface IntelligenceOutlook {
+  opportunities: Array<{
+    type: string;
+    description: string;
+    impact: 'low' | 'medium' | 'high';
+    timeframe: string;
+  }>;
+  threats: Array<{
+    type: string;
+    description: string;
+    severity: 'low' | 'medium' | 'high';
+    timeframe: string;
+  }>;
+  recommendations: Array<{
+    action: string;
+    rationale: string;
+    priority: 'low' | 'medium' | 'high';
+  }>;
+  horizon: string;
+}
+
+export async function fetchScopeChildren(scopeId: string): Promise<ScopeChildSummary[]> {
+  const res = await api.get<ScopeChildSummary[]>(`/scope/${encodeURIComponent(scopeId)}/children`);
+  return res.data || [];
+}
+
+export async function fetchScopeGovernance(scopeId: string): Promise<GovernanceView | null> {
+  const res = await api.get<GovernanceView>(`/scope/${encodeURIComponent(scopeId)}/governance`);
+  return res.data || null;
+}
+
+export async function fetchScopeOperations(scopeId: string): Promise<OperationsView | null> {
+  const res = await api.get<OperationsView>(`/scope/${encodeURIComponent(scopeId)}/operations`);
+  return res.data || null;
+}
+
+export async function fetchScopeOutlook(scopeId: string): Promise<IntelligenceOutlook | null> {
+  const res = await api.get<IntelligenceOutlook>(`/scope/${encodeURIComponent(scopeId)}/outlook`);
+  return res.data || null;
+}
+
+// =============================================================================
+// Spine & Bargain API
+// =============================================================================
+
+export interface Spine {
+  scopeId: string;
+  scopeType: string;
+  [portId: string]: unknown;
+}
+
+export interface NegotiationState {
+  id: string;
+  requesterId: string;
+  parentId: string;
+  status: 'pending' | 'countered' | 'accepted' | 'rejected' | 'expired';
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface BargainState {
+  current: NegotiationState | null;
+  active: NegotiationState[];
+  hasActive: boolean;
+}
+
+export async function fetchScopeSpine(scopeId: string): Promise<Spine | null> {
+  const res = await api.get<Spine>(`/scope/${encodeURIComponent(scopeId)}/spine`);
+  return res.data || null;
+}
+
+export async function fetchScopeBargain(scopeId: string): Promise<BargainState | null> {
+  const res = await api.get<BargainState>(`/scope/${encodeURIComponent(scopeId)}/bargain`);
+  return res.data || null;
+}
+
+export async function requestBargain(
+  scopeId: string,
+  request: {
+    type: 'capacity' | 'tokens' | 'scope' | 'priority';
+    amount?: number;
+    scopeExpansion?: string[];
+    justification: string;
+    urgency?: 'low' | 'normal' | 'high' | 'critical';
+  }
+): Promise<{ ok: boolean; negotiation?: NegotiationState; error?: string }> {
+  const res = await api.post<{ ok: boolean; negotiation?: NegotiationState; error?: string }>(
+    `/scope/${encodeURIComponent(scopeId)}/bargain/request`,
+    request
+  );
+  return res.data || { ok: false, error: res.error };
+}
+
+// =============================================================================
+// Capabilities & Dependencies API
+// =============================================================================
+
+export interface Capability {
+  id: string;
+  name: string;
+  type: 'service' | 'data' | 'resource';
+  availability: number;
+  responseTime?: string;
+}
+
+export interface Dependency {
+  id: string;
+  capability: string;
+  providerId: string;
+  status: 'connected' | 'pending' | 'error';
+  connectedAt?: number;
+}
+
+export async function fetchScopeCapabilities(scopeId: string): Promise<Capability[]> {
+  const res = await api.get<Capability[]>(`/scope/${encodeURIComponent(scopeId)}/capabilities`);
+  return res.data || [];
+}
+
+export async function updateScopeCapabilities(scopeId: string, capabilities: string[]): Promise<boolean> {
+  const res = await api.put(`/scope/${encodeURIComponent(scopeId)}/capabilities`, { capabilities });
+  return res.ok;
+}
+
+export async function fetchScopeDependencies(scopeId: string): Promise<Dependency[]> {
+  const res = await api.get<Dependency[]>(`/scope/${encodeURIComponent(scopeId)}/dependencies`);
+  return res.data || [];
+}
+
+export async function connectDependency(
+  scopeId: string,
+  providerId: string,
+  capability: string
+): Promise<{ ok: boolean; dependency?: Dependency; error?: string }> {
+  const res = await api.post<{ ok: boolean; dependency?: Dependency; error?: string }>(
+    `/scope/${encodeURIComponent(scopeId)}/dependencies`,
+    { providerId, capability }
+  );
+  return res.data || { ok: false, error: res.error };
+}
+
+// =============================================================================
+// Siblings & Intervention API
+// =============================================================================
+
+export interface Sibling {
+  id: string;
+  name: string;
+  status: string;
+}
+
+export async function fetchScopeSiblings(scopeId: string): Promise<Sibling[]> {
+  const res = await api.get<Sibling[]>(`/scope/${encodeURIComponent(scopeId)}/siblings`);
+  return res.data || [];
+}
+
+export async function interveneChild(
+  scopeId: string,
+  childId: string,
+  action: 'halt' | 'resume' | 'reallocate' | 'override',
+  reason?: string
+): Promise<{ success: boolean; error?: string }> {
+  const res = await api.post<{ success: boolean; error?: string }>(
+    `/scope/${encodeURIComponent(scopeId)}/intervene`,
+    { childId, action, reason }
+  );
+  return res.data || { success: false, error: res.error };
 }

@@ -1,5 +1,5 @@
 /**
- * Verification Check Types (S3)
+ * Verification Check Types (Control)
  */
 
 export interface CheckFinding {

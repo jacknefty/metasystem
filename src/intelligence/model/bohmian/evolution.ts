@@ -6,7 +6,7 @@
 
 import { getBohmianState, updateBohmianState, computeConfiguration, computeMass } from './state.js';
 import { buildWaveFunction } from './wave.js';
-import { getS4Field } from './field.js';
+import { getIntelligenceField } from './field.js';
 import type { Configuration, BohmianState } from './types.js';
 
 function clamp(value: number, min: number, max: number): number {
@@ -16,7 +16,7 @@ function clamp(value: number, min: number, max: number): number {
 export async function evolveAgent(nodeId: string, dt: number): Promise<BohmianState> {
   const state = await getBohmianState(nodeId);
   const Q = await computeConfiguration(nodeId);
-  const field = await getS4Field();
+  const field = await getIntelligenceField();
   const mass = await computeMass(nodeId);
 
   const wave = buildWaveFunction(field, mass);

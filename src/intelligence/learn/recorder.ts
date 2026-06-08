@@ -69,7 +69,7 @@ export async function recordOutcome(workId: string): Promise<LearningRecord | nu
     recordedAt: Date.now(),
   };
 
-  await getChain().append('learning:recorded', 's4', workId, {
+  await getChain().append('learning:recorded', 'intelligence', workId, {
     workId,
     nodeId,
     outcome,

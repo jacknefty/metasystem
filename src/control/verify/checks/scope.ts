@@ -1,5 +1,5 @@
 /**
- * Scope Compliance Check (S3)
+ * Scope Compliance Check (Control)
  *
  * Did the node touch files outside its declared scope?
  */

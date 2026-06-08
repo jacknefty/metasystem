@@ -1,5 +1,5 @@
 /**
- * Onboarding — Bootstrap S5 identity when no root exists
+ * Onboarding — Bootstrap Identity when no root exists
  */
 
 import { useState } from 'react';
@@ -67,11 +67,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <div
             className="w-16 h-16 mx-auto mb-4 rounded-lg flex items-center justify-center"
             style={{
-              background: `${COLORS.s5.primary}20`,
-              border: `1px solid ${COLORS.s5.border}`,
+              background: `${COLORS.identity.primary}20`,
+              border: `1px solid ${COLORS.identity.border}`,
             }}
           >
-            <span style={{ color: COLORS.s5.text, fontSize: '1.5rem' }}>◆</span>
+            <span style={{ color: COLORS.identity.text, fontSize: '1.5rem' }}>◆</span>
           </div>
           <h1
             className="text-xl font-medium mb-2"
@@ -92,7 +92,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               key={s}
               className="w-2 h-2 rounded-full transition-colors"
               style={{
-                background: s === step ? COLORS.s5.primary : COLORS.border.subtle,
+                background: s === step ? COLORS.identity.primary : COLORS.border.subtle,
               }}
             />
           ))}
@@ -176,7 +176,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               disabled={!canProceed}
               className="px-6 py-2 rounded-lg transition-colors"
               style={{
-                background: canProceed ? COLORS.s5.primary : COLORS.bg.panel,
+                background: canProceed ? COLORS.identity.primary : COLORS.bg.panel,
                 color: canProceed ? COLORS.bg.void : COLORS.text.muted,
                 cursor: canProceed ? 'pointer' : 'not-allowed',
               }}
@@ -189,7 +189,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               disabled={loading}
               className="px-6 py-2 rounded-lg transition-colors"
               style={{
-                background: loading ? COLORS.bg.panel : COLORS.s5.primary,
+                background: loading ? COLORS.bg.panel : COLORS.identity.primary,
                 color: loading ? COLORS.text.muted : COLORS.bg.void,
               }}
             >

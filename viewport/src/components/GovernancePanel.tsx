@@ -186,9 +186,9 @@ export function GovernancePanel({ nodeId }: GovernancePanelProps) {
           </div>
           <div
             className="p-3 rounded text-sm"
-            style={{ background: `${COLORS.s5.primary}10`, border: `1px solid ${COLORS.s5.border}` }}
+            style={{ background: `${COLORS.identity.primary}10`, border: `1px solid ${COLORS.identity.border}` }}
           >
-            <div className="font-mono mb-1" style={{ color: COLORS.s5.text }}>
+            <div className="font-mono mb-1" style={{ color: COLORS.identity.text }}>
               β = {votingPower.β.toFixed(3)}
             </div>
             <div style={{ color: COLORS.text.muted }}>
@@ -239,7 +239,7 @@ export function GovernancePanel({ nodeId }: GovernancePanelProps) {
       </Section>
 
       {/* Audit Rates */}
-      <Section title="S3* Audit (Sporadic)">
+      <Section title="Audit (Sporadic)">
         <ConstantRow label="Node self-audit rate" value={formatPercent(constants.audit.nodeRate)} />
         <ConstantRow label="Context audit rate" value={formatPercent(constants.audit.contextRate)} />
         <ConstantRow label="DAO audit rate" value={formatPercent(constants.audit.daoRate)} />
@@ -251,7 +251,7 @@ export function GovernancePanel({ nodeId }: GovernancePanelProps) {
       </Section>
 
       {/* Housekeeping */}
-      <Section title="S2 Housekeeping">
+      <Section title="Coordination Housekeeping">
         <ConstantRow label="Starvation threshold" value={formatDuration(constants.housekeeping.starvationThresholdMs)} hint="unclaimed work" />
         <ConstantRow label="Hoarding threshold" value={formatDuration(constants.housekeeping.hoardingThresholdMs)} hint="held claims" />
         <ConstantRow label="Min interval" value={formatDuration(constants.housekeeping.minIntervalMs)} />

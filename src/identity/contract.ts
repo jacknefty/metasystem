@@ -110,6 +110,72 @@ export function loadIdentityAtScope(scope: ScopedPaths): IdentityContract | null
 }
 
 /**
+ * Save identity to a scope path.
+ * Regenerates markdown from the contract object.
+ */
+export function saveIdentityAtScope(scope: ScopedPaths, identity: IdentityContract): void {
+  const identityPath = scope.identity();
+  mkdirSync(dirname(identityPath), { recursive: true });
+  const markdown = generateIdentityMarkdown(identity);
+  writeFileSync(identityPath, markdown);
+}
+
+/**
+ * Generate identity.md markdown from contract object.
+ */
+function generateIdentityMarkdown(identity: IdentityContract): string {
+  const frontmatter = stringifyYaml(identity.frontmatter);
+
+  let content = `---
+${frontmatter}---
+
+# ${identity.name}
+
+## Purpose
+
+${identity.purpose}
+
+## Scope
+
+${identity.scope.map(s => `- \`${s}\``).join('\n')}
+`;
+
+  if (identity.boundaries.length > 0) {
+    content += `
+## Boundaries
+
+${identity.boundaries.map(b => `- ${b}`).join('\n')}
+`;
+  }
+
+  if (identity.obligations.length > 0) {
+    content += `
+## Obligations
+
+${identity.obligations.map(o => `- ${o}`).join('\n')}
+`;
+  }
+
+  if (identity.closureConditions.length > 0) {
+    content += `
+## Closure Conditions
+
+${identity.closureConditions.map(c => `- [${c.completed ? 'x' : ' '}] ${c.description}`).join('\n')}
+`;
+  }
+
+  if (Object.keys(identity.resources).length > 0) {
+    content += `
+## Resources
+
+${Object.entries(identity.resources).map(([k, v]) => `- **${k}**: \`${v}\``).join('\n')}
+`;
+  }
+
+  return content;
+}
+
+/**
  * Get effective governance parameters at a scope.
  * Walks up the hierarchy, inheriting from parent if not set locally.
  */

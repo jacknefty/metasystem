@@ -158,8 +158,74 @@ body {
 }
 
 /* ============================================
+   CUBE (Black Box Interface)
+   ============================================ */
+
+.cube-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.cube-perspective {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+}
+
+.cube-box {
+  position: relative;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 0 30px rgba(0, 255, 255, 0.15));
+}
+
+.cube-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  backface-visibility: hidden;
+  border-radius: 2px;
+}
+
+.cube-dock {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+  margin-bottom: 24px;
+}
+
+.cube-dock-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+/* ============================================
    FOCUS PANEL
    ============================================ */
+
+/* BlackBox Panel - VSM transducer interface */
+.blackbox-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-deep);
+  overflow: hidden;
+}
 
 .focus-panel {
   position: absolute;

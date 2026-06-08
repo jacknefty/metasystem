@@ -20,7 +20,7 @@ export async function measureWork(
   // Higher potential = harder position = more reward
   const tokenMultiplier = 1 + Math.min(state.quantumPotential * 0.1, 1);
 
-  // Record empty branches for S4 learning
+  // Record empty branches for Intelligence learning
   const emptyBranches: EmptyBranch[] = [];
   for (const condId of allConditions) {
     if (!verifiedConditions.includes(condId)) {

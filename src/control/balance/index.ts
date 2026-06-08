@@ -1,7 +1,7 @@
 /**
  * Balance — Public API
  *
- * Homeostat for S3/S4 balance.
+ * Homeostat for Control/Intelligence balance.
  */
 
 export {

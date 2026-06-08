@@ -1,7 +1,7 @@
 /**
  * Audit Log — Persistent record of all access decisions
  *
- * This is S5 policy enforcement logging, not S3* sporadic audit.
+ * This is Identity policy enforcement logging, not sporadic audit.
  */
 
 import { appendFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
