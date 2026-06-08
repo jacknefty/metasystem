@@ -313,6 +313,52 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Update identity.md at a scope path with verification results.
+ * Marks conditions as complete and updates status when all pass.
+ */
+export function updateScopeProgress(
+  scope: ScopedPaths,
+  updates: {
+    conditionResults?: Array<{ description: string; passed: boolean }>;
+    status?: 'active' | 'completed' | 'failed';
+  }
+): void {
+  const identityPath = scope.identity();
+  if (!existsSync(identityPath)) return;
+
+  let content = readFileSync(identityPath, 'utf-8');
+  const identity = parseIdentity(content);
+
+  // Update condition checkboxes
+  if (updates.conditionResults) {
+    for (const result of updates.conditionResults) {
+      const idx = identity.closureConditions.findIndex(
+        c => c.description.includes(result.description) || result.description.includes(c.description.split(' (')[0])
+      );
+      if (idx >= 0 && result.passed !== identity.closureConditions[idx].completed) {
+        const condition = identity.closureConditions[idx];
+        const oldMarker = result.passed ? '[ ]' : '[x]';
+        const newMarker = result.passed ? '[x]' : '[ ]';
+        content = content.replace(
+          new RegExp(`- \\${oldMarker} ${escapeRegex(condition.description)}`),
+          `- ${newMarker} ${condition.description}`
+        );
+      }
+    }
+  }
+
+  // Update status in frontmatter
+  if (updates.status) {
+    content = content.replace(
+      /^(status: )(active|completed|failed)/m,
+      `$1${updates.status}`
+    );
+  }
+
+  writeFileSync(identityPath, content);
+}
+
 function extractHeading(body: string): string | null {
   const match = body.match(/^# (.+)$/m);
   return match ? match[1].trim() : null;

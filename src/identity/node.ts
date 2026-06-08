@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { getChain } from '../coordination/channels/chain.js';
 import { deriveAllNodes, deriveNode, type DerivedNode } from '../coordination/resources/derive.js';
 import { DEFAULT_SETTINGS, type NodeSettings } from './settings.js';
@@ -44,15 +44,23 @@ export async function createNode(input: CreateNodeInput): Promise<string> {
   const nodeId = generateNodeId();
   const nodeScope = dao.node(nodeId);
   const scopePath = nodeScope.root();
-  const parentPath = dao.root();
 
+  // Unified scaffold with node-specific options
   scaffoldScope(scopePath, {
     type: 'node',
     id: nodeId,
     name: input.name,
     purpose: input.purpose,
     scope: input.scope,
+    hubId: input.hubId,
+    autonomyLevel: input.settings?.autonomyLevel,
   });
+
+  // Create memory directory
+  const memoryDir = paths.nodeMemory(nodeId);
+  if (!existsSync(memoryDir)) {
+    mkdirSync(memoryDir, { recursive: true });
+  }
 
   await chain.append('identity:created', 'system', nodeId, {
     name: input.name,
@@ -64,81 +72,9 @@ export async function createNode(input: CreateNodeInput): Promise<string> {
     await chain.append('identity:settings', 'system', nodeId, input.settings);
   }
 
-  // Create additional node-specific files (memory dir, enhanced identity.md)
-  ensureNodeDirectory(nodeId, input);
-
   return nodeId;
 }
 
-function ensureNodeDirectory(nodeId: string, input: CreateNodeInput): void {
-  const nodeDir = paths.node(nodeId);
-  const memoryDir = paths.nodeMemory(nodeId);
-
-  if (!existsSync(nodeDir)) {
-    mkdirSync(nodeDir, { recursive: true });
-  }
-  if (!existsSync(memoryDir)) {
-    mkdirSync(memoryDir, { recursive: true });
-  }
-
-  const identityPath = paths.nodeIdentityFile(nodeId);
-  if (!existsSync(identityPath)) {
-    const identityContent = generateIdentityMd(nodeId, input);
-    writeFileSync(identityPath, identityContent);
-  }
-}
-
-function generateIdentityMd(nodeId: string, input: CreateNodeInput): string {
-  const scope = input.scope ?? ['**'];
-  const autonomyLevel = input.settings?.autonomyLevel ?? 'supervised';
-
-  let membershipsYaml = '';
-  if (input.hubId) {
-    membershipsYaml = `memberships:
-  - hub: ${input.hubId}
-    role: contributor
-    capacity: 1.0
-`;
-  }
-
-  return `---
-id: ${nodeId}
-type: node
-${membershipsYaml}created: ${new Date().toISOString()}
-closes: conditions
----
-
-# ${input.name}
-
-## Purpose
-
-${input.purpose}
-
-## Scope
-
-${scope.map(s => `- \`${s}\``).join('\n')}
-
-## Closure Conditions
-
-- [ ] All assigned work completed
-- [ ] No pending obligations
-
-## Resources
-
-- **Tools**: \`builtin:*\`
-- **Autonomy**: ${autonomyLevel}
-
-## Obligations
-
-- Complete assigned work
-- Operate within declared scope
-
-## Boundaries
-
-- Will not exceed declared scope
-- Will not access undeclared resources
-`;
-}
 
 export function getNodeIdentityContent(nodeId: string): string | null {
   const identityPath = paths.nodeIdentityFile(nodeId);

@@ -54,10 +54,15 @@ export interface Epic {
   stories: Story[];
 }
 
+import type { VSMRole } from '../../perceive/vsm-roles.js';
+
+export type { VSMRole };
+
 export interface Story {
   id: string;
   name: string;
   outcome: string;
+  vsmRole?: VSMRole;
   conditions: StoryCondition[];
   leverage: number;
   uncertainty: number;

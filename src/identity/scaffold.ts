@@ -21,6 +21,9 @@ export interface ScaffoldOptions {
   conditions?: Condition[];
   scope?: string[];
   minimal?: boolean;
+  // Node-specific options
+  hubId?: string;
+  autonomyLevel?: 'locked' | 'supervised' | 'autonomous';
 }
 
 export function scaffoldScope(scopePath: string, options: ScaffoldOptions): void {
@@ -49,12 +52,13 @@ export function scaffoldScope(scopePath: string, options: ScaffoldOptions): void
 }
 
 function generateIdentity(options: ScaffoldOptions): string {
-  const { type, id, name, purpose, parentId, parentType, conditions, scope } = options;
+  const { type, id, name, purpose, parentId, parentType, conditions, scope, hubId, autonomyLevel } = options;
 
   const scopeLines = scope && scope.length > 0
     ? scope.map(s => `- \`${s}\``).join('\n')
     : '- `**`';
 
+  // Build frontmatter
   let frontmatter = `---
 id: ${id}
 type: ${type}`;
@@ -66,11 +70,28 @@ type: ${type}`;
     frontmatter += `\nparentType: ${parentType}`;
   }
 
+  // Node-specific: memberships
+  if (type === 'node' && hubId) {
+    frontmatter += `
+memberships:
+  - hub: ${hubId}
+    role: contributor
+    capacity: 1.0`;
+  }
+
   frontmatter += `
 created: ${new Date().toISOString()}
-status: active
+status: active`;
+
+  // Nodes use closes: conditions
+  if (type === 'node') {
+    frontmatter += `\ncloses: conditions`;
+  }
+
+  frontmatter += `
 ---`;
 
+  // Build body
   let content = `${frontmatter}
 
 # ${name}
@@ -84,11 +105,41 @@ ${purpose}
 ${scopeLines}
 `;
 
+  // Closure conditions - all scopes can have them
   if (conditions && conditions.length > 0) {
     content += `
 ## Closure Conditions
 
 ${conditions.map(c => `- [ ] ${c.description} (\`${c.verifier}\`)`).join('\n')}
+`;
+  } else if (type === 'node') {
+    // Default closure conditions for nodes
+    content += `
+## Closure Conditions
+
+- [ ] All assigned work completed
+- [ ] No pending obligations
+`;
+  }
+
+  // Node-specific sections
+  if (type === 'node') {
+    const level = autonomyLevel ?? 'supervised';
+    content += `
+## Resources
+
+- **Tools**: \`builtin:*\`
+- **Autonomy**: ${level}
+
+## Obligations
+
+- Complete assigned work
+- Operate within declared scope
+
+## Boundaries
+
+- Will not exceed declared scope
+- Will not access undeclared resources
 `;
   }
 

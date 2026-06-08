@@ -86,6 +86,8 @@ export {
   getIdentityPath,
   computeAttestation,
   canClose,
+  updateClosureCondition,
+  updateScopeProgress,
   type IdentityContract,
   type IdentityFrontmatter,
   type Membership,

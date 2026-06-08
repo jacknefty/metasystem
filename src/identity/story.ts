@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { getChain } from '../coordination/channels/chain.js';
 import { dao } from './scoped-paths.js';
 import { scaffoldScope } from './scaffold.js';
+import { updateScopeProgress } from './contract.js';
 import type { Condition, Bounty } from '../coordination/channels/events.js';
 
 export interface CreateStoryInput {
@@ -20,6 +21,8 @@ export interface CreateStoryInput {
   conditions: Condition[];
   leverage?: number;
   uncertainty?: number;
+  dependsOn?: string[];
+  coupledTo?: string[];
 }
 
 function generateStoryId(): string {
@@ -51,6 +54,8 @@ export async function createStory(input: CreateStoryInput): Promise<string> {
     conditions: input.conditions,
     leverage: input.leverage,
     uncertainty: input.uncertainty,
+    dependsOn: input.dependsOn || [],
+    coupledTo: input.coupledTo || [],
     scopePath,
     parentPath,
   });
@@ -96,9 +101,18 @@ export async function submitStory(storyId: string, branch: string): Promise<void
 
 export async function verifyStory(
   storyId: string,
-  results: Array<{ conditionId: string; passed: boolean; evidence: string }>
+  epicId: string,
+  hubId: string,
+  results: Array<{ conditionId: string; description: string; passed: boolean; evidence: string }>
 ): Promise<void> {
   const passed = results.every(r => r.passed);
+
+  // Update identity.md with verification results
+  const storyScope = dao.hub(hubId).epic(epicId).story(storyId);
+  updateScopeProgress(storyScope, {
+    conditionResults: results.map(r => ({ description: r.description, passed: r.passed })),
+    status: passed ? 'completed' : 'active',
+  });
 
   await getChain().append('story:verified', 'system', storyId, {
     passed,
@@ -107,7 +121,18 @@ export async function verifyStory(
   });
 }
 
-export async function completeStory(storyId: string, success: boolean): Promise<void> {
+export async function completeStory(
+  storyId: string,
+  epicId: string,
+  hubId: string,
+  success: boolean
+): Promise<void> {
+  // Update identity.md status
+  const storyScope = dao.hub(hubId).epic(epicId).story(storyId);
+  updateScopeProgress(storyScope, {
+    status: success ? 'completed' : 'failed',
+  });
+
   await getChain().append('story:completed', 'system', storyId, {
     success,
     completedAt: Date.now(),

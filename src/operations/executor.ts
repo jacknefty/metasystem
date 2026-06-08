@@ -34,7 +34,27 @@ const DEFAULT_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 function getExecutorCommand(name: string, defaultCommand: string): string {
   const envKey = `${name.toUpperCase()}_PATH`;
-  return process.env[envKey] || defaultCommand;
+  if (process.env[envKey]) {
+    return process.env[envKey]!;
+  }
+
+  // Try to find the command in common locations
+  const commonPaths = [
+    `${process.env.HOME}/.local/bin/${defaultCommand}`,
+    `/usr/local/bin/${defaultCommand}`,
+    `/opt/homebrew/bin/${defaultCommand}`,
+  ];
+
+  for (const path of commonPaths) {
+    try {
+      execSync(`test -x "${path}"`, { stdio: 'ignore' });
+      return path;
+    } catch {
+      // Not found, try next
+    }
+  }
+
+  return defaultCommand;
 }
 
 const EXECUTORS: Record<string, ExecutorConfig> = {

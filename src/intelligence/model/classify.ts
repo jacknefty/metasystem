@@ -1,17 +1,23 @@
 /**
  * S4 Classification — Project archetype detection
+ *
+ * Classifies software components by their VSM role, helping the system
+ * understand the cybernetic purpose of each piece.
  */
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { minimatch } from 'minimatch';
-import { ARCHETYPES, type Archetype, type VerifierRequirement } from '../perceive/archetypes.js';
+import { SOFTWARE_ARCHETYPES, type Archetype, type VerifierRequirement } from '../perceive/archetypes.js';
+import { type VSMRole, getPlacementForRole } from '../perceive/vsm-roles.js';
 
 export interface ClassificationResult {
   archetype: Archetype;
   confidence: number;
   matchedSignals: string[];
   suggestedVerifiers: VerifierRequirement[];
+  vsmRole: VSMRole;
+  placementHint: string;
 }
 
 export async function classifyContext(contextPath: string): Promise<ClassificationResult | null> {
@@ -23,7 +29,7 @@ export async function classifyContext(contextPath: string): Promise<Classificati
 
   const results: Array<{ archetype: Archetype; score: number; matched: string[] }> = [];
 
-  for (const archetype of Object.values(ARCHETYPES)) {
+  for (const archetype of Object.values(SOFTWARE_ARCHETYPES)) {
     const { score, matched } = scoreArchetype(archetype, files, dependencies);
     if (score > 0) {
       results.push({ archetype, score, matched });
@@ -42,6 +48,8 @@ export async function classifyContext(contextPath: string): Promise<Classificati
     confidence: best.score / maxScore,
     matchedSignals: best.matched,
     suggestedVerifiers: best.archetype.verifiers,
+    vsmRole: best.archetype.vsmRole,
+    placementHint: getPlacementForRole(best.archetype.vsmRole),
   };
 }
 

@@ -12,6 +12,7 @@ import { getNode } from '../../../identity/node.js';
 import { createEpic } from '../../../identity/epic.js';
 import { createStory, postStoryBounty } from '../../../identity/story.js';
 import { classifyContext } from '../../model/classify.js';
+import { buildVSMRolesPrompt } from '../../perceive/vsm-roles.js';
 import {
   inferWeight,
   buildVerifierPromptSection,
@@ -197,8 +198,6 @@ function buildDecompositionPrompt(
   context: HubContext,
   archetypeSection: string
 ): string {
-  const testCommand = context.testPattern || 'npm test';
-
   return `You are S4 (Intelligence) in a Viable System Model. Decompose this work into vertical slices.
 
 CONTRACT:
@@ -216,12 +215,31 @@ CONTEXT:
 - Test Pattern: ${context.testPattern || 'none detected'}
 ${archetypeSection}
 
-RULES:
-1. Cut along seams of low coupling - find where the system naturally divides
+${buildVSMRolesPrompt()}
+
+FOLDER STRUCTURE — Place components by their VSM role:
+- S1:operations → operations/
+- S2:coordination → coordination/
+- S3:control → control/
+- S3*:audit → audit/
+- S4:intelligence → intelligence/
+- S5:identity → identity/
+- transducer:inward, transducer:outward → bridge/
+- channel:algedonic → bridge/
+- channel:data → coordination/channels/
+- substrate → lib/
+
+For user interfaces (web, mobile, CLI):
+- These are TRANSDUCERS — they translate variety across the human/system boundary
+- Place them in bridge/viewport/ (web) or bridge/cli/ (command line)
+
+DECOMPOSITION RULES:
+1. Cut along seams of low coupling — find where the system naturally divides
 2. Each story is a VERTICAL slice through all layers (not a horizontal layer)
 3. Each story delivers end-to-end value, however small
 4. Score each story: leverage (1-10) = how much does this unlock? uncertainty (1-10) = how unsure are we?
-5. The highest leverage x uncertainty story is the leverage point - proves the core loop works
+5. The highest leverage × uncertainty story is the leverage point — proves the core loop works
+6. Identify the VSM role of each story — what cybernetic function does it serve?
 
 ${buildVerifierPromptSection()}
 
@@ -241,12 +259,11 @@ RESPOND WITH JSON ONLY:
           "id": "w-story-id",
           "name": "Story Name",
           "outcome": "What this story delivers",
+          "vsmRole": "S1:operations | S2:coordination | S3:control | S3*:audit | S4:intelligence | S5:identity | transducer:inward | transducer:outward | channel:algedonic | channel:data | substrate",
           "conditions": [
-            { "description": "Game module exists", "verifier": "exists:game.js" },
-            { "description": "Board state array defined", "verifier": "contains:game.js:let board" },
-            { "description": "Win detection works", "verifier": "passes:node -e \\"const g=require('./game'); if(!g.checkWin) process.exit(1)\\"" },
-            { "description": "AI makes valid moves only", "verifier": "passes:node -e \\"const g=require('./game'); const board=[1,0,0,0,0,0,0,0,0]; const move=g.aiMove(board); if(board[move]!==0) process.exit(1)\\"" },
-            { "description": "No JS errors on load", "verifier": "passes:node --check game.js" }
+            { "description": "Module exists", "verifier": "exists:path/to/file" },
+            { "description": "Function defined", "verifier": "contains:path/to/file:functionName" },
+            { "description": "Behavior correct", "verifier": "passes:test command" }
           ],
           "leverage": 8,
           "uncertainty": 7,
@@ -356,6 +373,7 @@ function normalizeStory(s: any): Story {
     id: workId,
     name: s.name || 'Unnamed Story',
     outcome: s.outcome || '',
+    vsmRole: s.vsmRole || undefined,
     conditions,
     leverage: Math.min(10, Math.max(1, s.leverage || 5)),
     uncertainty: Math.min(10, Math.max(1, s.uncertainty || 5)),
@@ -470,6 +488,8 @@ export async function createScopesFromGraph(
         })),
         leverage: story.leverage,
         uncertainty: story.uncertainty,
+        dependsOn: story.dependsOn,
+        coupledTo: story.coupledTo,
       });
       storyIds.push(storyId);
 

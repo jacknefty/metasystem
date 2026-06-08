@@ -669,6 +669,8 @@ export interface EventPayloads {
     conditions: Condition[];
     leverage?: number;
     uncertainty?: number;
+    dependsOn: string[];
+    coupledTo: string[];
     scopePath: string;
     parentPath: string;
   };

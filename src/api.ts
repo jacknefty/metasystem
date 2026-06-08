@@ -604,7 +604,8 @@ async function handlePMReview(
   if (lower === 'approve' || lower === 'yes' || lower === 'lgtm' || lower === 'looks good' || lower === 'ship it') {
     const graph = session.workGraph!;
 
-    const createdIds = await pm.createWorkFromGraph(
+    // Create proper Epic → Story hierarchy with scope folders
+    const { epics, stories } = await pm.createScopesFromGraph(
       graph,
       session.hubId,
       session.hubId
@@ -612,7 +613,7 @@ async function handlePMReview(
 
     pm.transitionPhase(session, 'active');
 
-    const response = `Created ${createdIds.length} work contracts. The dispatch loop will start work on the leverage point. I'll be here if anything needs refinement.`;
+    const response = `Created ${epics.length} epic(s) with ${stories.length} story contracts. Stories are posted as bounties - agents can claim them. I'll be here if anything needs refinement.`;
 
     pm.addTurn(session, 'pm', response);
 
@@ -620,7 +621,7 @@ async function handlePMReview(
       sessionId: session.id,
       phase: 'active',
       response,
-      workContractsCreated: createdIds,
+      workContractsCreated: stories,
     };
   }
 
@@ -759,7 +760,8 @@ app.post('/api/pm/sessions/:id/execute', wrap(async (req, res) => {
     return;
   }
 
-  const createdIds = await pm.createWorkFromGraph(
+  // Create proper Epic → Story hierarchy with scope folders
+  const { epics, stories } = await pm.createScopesFromGraph(
     session.workGraph,
     session.hubId,
     req.body.ownerId || session.hubId
@@ -769,7 +771,9 @@ app.post('/api/pm/sessions/:id/execute', wrap(async (req, res) => {
 
   res.status(201).json({
     sessionId: session.id,
-    workContractsCreated: createdIds,
+    epicsCreated: epics,
+    storiesCreated: stories,
+    workContractsCreated: stories, // backwards compat
   });
 }));
 
@@ -794,11 +798,13 @@ app.post('/api/work/:id/decompose', wrap(async (req, res) => {
   };
 
   const { graph, warnings } = await pm.generateWorkGraphWithAudit(contract, context);
-  const createdIds = await pm.createWorkFromGraph(graph, hubId || w.hubId, w.ownerId);
+  const { epics, stories } = await pm.createScopesFromGraph(graph, hubId || w.hubId, w.ownerId);
 
   res.json({
     parentWorkId: str(req.params.id),
-    subtaskIds: createdIds,
+    epicsCreated: epics,
+    storiesCreated: stories,
+    subtaskIds: stories, // backwards compat
     warnings,
   });
 }));

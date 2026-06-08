@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { getChain } from '../coordination/channels/chain.js';
 import { at } from './scoped-paths.js';
 import { scaffoldScope } from './scaffold.js';
+import { updateScopeProgress } from './contract.js';
 
 export interface CreateTaskInput {
   name: string;
@@ -53,7 +54,18 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
   return id;
 }
 
-export async function completeTask(taskId: string, success: boolean): Promise<void> {
+export async function completeTask(
+  taskId: string,
+  parentPath: string,
+  success: boolean
+): Promise<void> {
+  // Update identity.md status
+  const parentScope = at(parentPath);
+  const taskScope = parentScope.task(taskId);
+  updateScopeProgress(taskScope, {
+    status: success ? 'completed' : 'failed',
+  });
+
   await getChain().append('task:completed', 'system', taskId, {
     success,
     completedAt: Date.now(),
